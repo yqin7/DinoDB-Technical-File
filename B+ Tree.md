@@ -204,7 +204,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 
 ```go
-			[key3]         (页面0)
+          [key3]         (页面0)
           /     \
       [key2]   [key4]    (其他页面)
       /    \    /    \
@@ -226,7 +226,7 @@ func (index *BTreeIndex) Select() ([]entry.Entry, error)
 以遍历整棵树为例，初始结构:
 
 ```
-			[key3]         (页面0)
+          [key3]         (页面0)
           /     \
       [key2]   [key4]    (其他页面)
       /    \    /    \
@@ -280,7 +280,7 @@ func (index *BTreeIndex) SelectRange(startKey int64, endKey int64) ([]entry.Entr
 以遍历查找startKey = key2, endKey = key4为例，初始结构:
 
 ```
-			[key3]         (页面0)
+           [key3]         (页面0)
           /     \
       [key2]   [key4]    (其他页面)
       /    \    /    \
