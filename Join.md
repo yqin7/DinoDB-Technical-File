@@ -45,7 +45,7 @@ typora-root-url: ./images
 - 使用相同的哈希函数计算表S元组的哈希值，并在对应的哈希表HT_R中查找匹配的元组。
 - 如果找到匹配的元组，则输出连接结果。
 
-![partitioned_hash_join](.\images\partitioned_hash_join.png)
+![partitioned_hash_join](./images/partitioned_hash_join.png)
 
 
 
