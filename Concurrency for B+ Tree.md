@@ -17,65 +17,65 @@
 
 **插入key 45**
 
-![image-20250213184943150](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213184943150.png)
+![image-20250213184943150](./images/concurrency1.png)
 
 - 首先锁住20
 
-![1739491013536](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\1739491013536.png)
+![1739491013536](./images/concurrency2.png)
 
 - 再锁住35
 
-![image-20250213185819799](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213185819799.png)
+![image-20250213185819799](./images/concurrency3.png)
 
 - 锁住35后，检查该节点插入是否需要分裂。由于无需分裂，解锁父节点20。
 
-![image-20250213190451631](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213190451631.png)
+![image-20250213190451631](./images/concurrency4.png)
 
 - 继续锁住节点38-44。由于不确定节点38-44会不会分裂，所以不解锁节点35
 
-![image-20250213195538114](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213195538114.png)
+![image-20250213195538114](./images/concurrency5.png)
 
 - 锁住节点44
 
-![image-20250213195757466](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213195757466.png)
+![image-20250213195757466](./images/concurrency6.png)
 
 - 由于44不会分裂，所以向上解锁所有父节点。等到45插入完毕，解锁节点44-45
 
-![image-20250213195837833](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213195837833.png)
+![image-20250213195837833](./images/concurrency7.png)
 
 ##### b. 分裂的情况
 
 **插入25**
 
-![image-20250213201244089](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213201244089.png)
+![image-20250213201244089](./images/concurrency8.png)
 
 - 首先锁住20
 
-![1739491013536](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\1739491013536.png)
+![1739491013536](./images/concurrency2.png)
 
 - 再锁住35
 
-![image-20250213185819799](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213185819799.png)
+![image-20250213185819799](./images/concurrency3.png)
 
 - 锁住35后，检查该节点插入是否需要分裂。由于无需分裂，解锁父节点20。
 
-![image-20250213190451631](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213190451631.png)
+![image-20250213190451631](./images/concurrency4.png)
 
 - 锁住节点23 
 
-![image-20250213203410903](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213203410903.png)
+![image-20250213203410903](./images/concurrency9.png)
 
 - 解锁节点35，因为无需分裂
 
-![image-20250213204136679](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250213204136679.png)
+![image-20250213204136679](./images/concurrency10.png)
 
 - 锁住节点23-31
 
-![1739497420025](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\1739497420025.jpg)
+![1739497420025](./images/concurrency11.png)
 
 - 完成新节点分裂后，从下往上解锁节点。**注意：新节点不会上锁，因为新创建的节点只对当前线程可见，其他线程无法访问这个新节点，所以不需要上锁。**
 
-![fe815357d787baa830ef2701d061b2b](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\fe815357d787baa830ef2701d061b2b.jpg)
+![fe815357d787baa830ef2701d061b2b](./images/concurrency12.png)
 
 #### C. 测试方法
 
@@ -137,11 +137,11 @@ go test './test/concurrency/...' -race -timeout 180s -v
 
 **1. 顺序插入10000条数据测试**
 
-![并发顺序插入：10000条数据的性能分析](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\并发顺序插入：10000条数据的性能分析.png)
+![insert_i_a_test](./images./insert_i_a_test.png)
 
 **2. 乱序插入10000条数据测试**
 
-![并发乱序插入：10000条数据的性能分析](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\并发乱序插入：10000条数据的性能分析.png)
+!![insert_i_i_test](./images./insert_i_i_test.png)
 
 ##### d. 补充说明
 
@@ -188,27 +188,27 @@ for i := 0; i < *nFlag; i++ {
 
 - 锁住头节点20
 
-![1739557873023](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\1739557873023.jpg)
+![1739557873023](./images/concurrency2.png)
 
 - 锁住节点10
 
-![1739557930596](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\1739557930596.jpg)
+![1739557930596](./images/concurrency13.png)
 
 - 释放节点20
 
-![image-20250214133316778](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250214133316778.png)
+![image-20250214133316778](./images/concurrency14.png)
 
 - 相同的流程直到节点3-4，锁住3-4， 释放节点6
 
-![image-20250214133507243](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250214133507243.png)
+![image-20250214133507243](./images/concurrency15.png)
 
 - 读取节点3-4后，锁住6-9
 
-![1739558465287](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\1739558465287.jpg)
+![1739558465287](./images/concurrency16.png)
 
 - 释放3-4后，执行相同流程直到结尾。
 
-![image-20250214134158905](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250214134158905.png)
+![image-20250214134158905](./images/concurrency17.png)
 
 #### C. 测试方法
 
@@ -219,7 +219,7 @@ for i := 0; i < *nFlag; i++ {
 
 ##### **b. 性能测试**
 
-![并发查询性能：5000条数据连续200次查询](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\并发查询性能：5000条数据连续200次查询.png)
+![select_test.png](./images/select_test.png)
 
 - 简单增加线程数并不能线性提升性能 
 - 8线程时出现性能显著下降
