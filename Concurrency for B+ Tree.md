@@ -94,12 +94,6 @@ go build -buildvcs=false -o dinodb_client ./cmd/dinodb_client
 go build -buildvcs=false -o dinodb_stress ./cmd/dinodb_stress
 ```
 
-- 单个竞态文件测试命令
-
-``` go
-./dinodb_stress -index=btree -workload=workloads/i-a-sm.txt -n=8 -verify
-```
-
 - workload 文件类型：
 
   - i-a-sm.txt: 顺序小数据集 (ascending, small)
@@ -134,6 +128,13 @@ go test './test/concurrency/...' -race -timeout 180s -v
 
 - 多线程测试：多个线程同时执行所有插入操作
 - 使用大数据集
+- 单个竞态文件测试命令
+
+```go
+./dinodb_stress -index=btree -workload=workloads/i-a-sm.txt -n=8 -verify
+```
+
+
 
 **1. 顺序插入10000条数据测试**
 
@@ -222,6 +223,6 @@ for i := 0; i < *nFlag; i++ {
 ![select_test.png](./images/select_test.png)
 
 - 简单增加线程数并不能线性提升性能 
-- 8线程时出现性能显著下降
-- 1-4线程间性能相对稳定
+- 16线程时出现性能显著下降
+- 1-8线程间性能相对稳定
 -  B+ 树的读锁虽然允许共享访问，但在高并发下仍存在性能瓶颈。
