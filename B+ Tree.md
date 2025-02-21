@@ -844,7 +844,7 @@ func (index *BTreeIndex) CursorAt(key int64) (cursor.Cursor, error)
 
 **2. for循环获得key所在叶子节点的位置**
 
-- 这里用节点是否为internalNode作为for控制条件。如果是internalNode继续向下查找；如果找到非internalNode就是叶子节点，则停止查找。
+- 这里用节点是否为internalNode作为for控制条件。如果是internalNode继续向下查找；如果找到非internalNode就是叶子节点，则停止查找
 
 **3. 创建游标结构体**
 
@@ -858,5 +858,5 @@ cursor := &BTreeCursor{
 
 **4. 处理 key 不在当前节点的情况**
 
-- 由于前面在内部节点search时，如果查找的叶子节点刚好也是内部节点索引的情况都返回左子树索引。（具体见源代码注释的例子）
-- 调用cursor.Next()移动到下一个叶子节点。
+- 由于前面在内部节点search时，如果查找的叶子节点刚好也是内部节点索引的情况都返回左子树索引（具体见源代码注释的例子）
+- 调用cursor.Next()移动到下一个叶子节点
