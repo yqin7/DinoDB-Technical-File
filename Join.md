@@ -1,7 +1,3 @@
----
-typora-root-url: ./images
----
-
 # Join
 
 ## 1. 重要概念
@@ -26,7 +22,7 @@ typora-root-url: ./images
 - 如果哈希表太大而无法完全放入内存，就需要将部分哈希表写入磁盘，这会显著降低性能。
 - 假设表R: 100GB，表S: 200GB， 哈希表HT_R: 需要容纳整个R表的数据 ≈ 100GB。
 
-![basic_join](/basic_join.png)
+![basic_join](./images/basic_join.png)
 
 ### 1.2 分区哈希连接
 
