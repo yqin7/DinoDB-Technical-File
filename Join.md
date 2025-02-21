@@ -235,7 +235,7 @@ func buildHashIndex(
      needSplit := bucket.Insert(key, value)  
   ```
 
-![build_hash_index](.\images\build_hash_index.png)
+![build_hash_index](./images/build_hash_index.png)
 
 **4. 返回结果**：
 
@@ -287,7 +287,7 @@ func probeBuckets(
 
 ## 3. BloomFilter Function
 
-![bloom_filter](.\images\bloom_filter.png)
+![bloom_filter](./images/bloom_filter.png)
 
 #### A. 参数介绍
 
@@ -376,11 +376,11 @@ h2 = MurmurHash(5) % 1024 = 456
 
 **a. 左表1000条数据，右表100条数据，不同疏密程度10次运行耗时**
 
-![Join数据匹配疏密测试1000-100](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\Join数据匹配疏密测试1000-100.png)
+![Join_1000_100_test](./images/Join_1000_100_test.png)
 
 **b. 左表10000条数据，右表1000条数据，不同疏密程度10次运行耗时**
 
-![Join数据匹配疏密测试10000-1000](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\Join数据匹配疏密测试10000-1000.png)
+![Join_1000_100_test](./images/Join_10000_1000_test.png)
 
 - 随着数据量增加，执行时间呈线性增长 
 - 在大数据量下，不同匹配率的性能非常稳定
