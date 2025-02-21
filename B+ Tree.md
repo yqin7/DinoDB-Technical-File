@@ -213,7 +213,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 **5. 图示**
 
-![c4d52ca6c40642e06a26bff98ffec20](C:\Users\huo00\OneDrive\Documents\WeChat Files\wxid_0hld3sje81eo22\FileStorage\Temp\c4d52ca6c40642e06a26bff98ffec20.jpg)
+![b_tree_insert](./images/b_tree_insert.jpg)
 
 #### 2.2.2 Select
 
