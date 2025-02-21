@@ -125,9 +125,8 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 **1. 叶子节点插入和分裂**
 
-调用链：
-
-`LeafNode[key3,key4].insert(5) -> LeafNode.split()`
+- 调用链：`LeafNode[key3,key4].insert(5) -> LeafNode.split()`
+- 分裂结果：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`，**这里返回的Split信息是上一层内部节点中插入的新的分隔键和指针（子节点页号）**
 
 ```
 [key3,key4] -> [key3,key4,key5] -> [key3] | [key4,key5]
@@ -140,9 +139,9 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 **2. 内部节点处理分裂**
 
-- 收到叶子节点的分裂信息：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`
+- 收到叶子节点的分隔键和指针信息：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`
 
-- 在 [key2,key3] 中**插入 key4，插入指向叶子节点分裂信息中rightPN的指针**
+- 在 [key2,key3] 中**插入 key4，插入指向叶子节点分裂信息中rightPN的指针（子节点页号）**
 
 - 内部节点变为 [key2,key3,key4]
 
@@ -186,7 +185,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 4. 分裂结果
 
-   Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}
+   Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
 
 **4. 组装新的根节点**
 
@@ -426,20 +425,20 @@ func (index *BTreeIndex) Update(key int64, value int64) error
 | - key2 = 20            |  // 10字节
 | - key3 = 30            |  // 10字节
 |       ...              |
-| - key202 = 2020        |  // 10字节
+| - key201 = 2010        |  // 10字节
 +------------------------+  KEYS_OFFSET(11) + 202*KEY_SIZE
 | Page Number Array      |
 | - page1                |  // 10字节
 | - page2                |  // 10字节
 | - page3                |  // 10字节
 |       ...              |
-| - page203              |  // 10字节
+| - page202              |  // 10字节
 +------------------------+  PNS_OFFSET(2041) + 203*PN_SIZE
 
 关键偏移量：
 - NODE_HEADER_SIZE = 11  (1 + 10)
 - KEYS_OFFSET = NODE_HEADER_SIZE = 11
-- PNS_OFFSET = KEYS_OFFSET + (202 * 10)
+- PNS_OFFSET = KEYS_OFFSET + (201 * 10)
 - 总大小 = 4096字节(一个页面)
 ```
 
@@ -485,7 +484,7 @@ func (node *InternalNode) insert(key int64, value int64, update bool) (Split, er
    - 根据go的语法，因为和internalNode共享一个node interface，所以可以找到的是leafNode，也可以是internalNode。
 
 3. **获得页面管理器：**
-   - 用于并发控制。
+   - 确保在函数返回时候释放页面资源，将没有被引用的页放入unpinnedList等待被刷盘后再次写入。
 
 4. **执行递归插入**：
    - 在子节点中递归执行插入操作，调用本身insert()方法，得到result是一个split结构体。
