@@ -1,7 +1,3 @@
----
-typora-root-url: ./images
----
-
 # Join
 
 ## 1. 重要概念
