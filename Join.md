@@ -1,3 +1,7 @@
+---
+typora-root-url: ./images
+---
+
 # Join
 
 ## 1. 重要概念
@@ -22,7 +26,7 @@
 - 如果哈希表太大而无法完全放入内存，就需要将部分哈希表写入磁盘，这会显著降低性能。
 - 假设表R: 100GB，表S: 200GB， 哈希表HT_R: 需要容纳整个R表的数据 ≈ 100GB。
 
-![image-20250207111400736](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250207111400736.png)
+![image-20250207111400736](.\images\basic_join.png)
 
 ### 1.2 分区哈希连接
 
@@ -41,7 +45,7 @@
 - 使用相同的哈希函数计算表S元组的哈希值，并在对应的哈希表HT_R中查找匹配的元组。
 - 如果找到匹配的元组，则输出连接结果。
 
-![image-20250207111457010](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250207111457010.png)
+![partitioned_hash_join](.\images\partitioned_hash_join.png)
 
 
 
@@ -235,7 +239,7 @@ func buildHashIndex(
      needSplit := bucket.Insert(key, value)  
   ```
 
-![image-20250207111819975](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250207111819975.png)
+![build_hash_index](.\images\build_hash_index.png)
 
 **4. 返回结果**：
 
@@ -287,7 +291,7 @@ func probeBuckets(
 
 ## 3. BloomFilter Function
 
-![image-20250207163632569](C:\Users\huo00\AppData\Roaming\Typora\typora-user-images\image-20250207163632569.png)
+![bloom_filter](.\images\bloom_filter.png)
 
 #### A. 参数介绍
 
@@ -374,11 +378,11 @@ h2 = MurmurHash(5) % 1024 = 456
 
 ### B. 性能测试
 
-**a. 左表1000条数据，右表100条数据，不同疏密程度耗时**
+**a. 左表1000条数据，右表100条数据，不同疏密程度10次运行耗时**
 
 ![Join数据匹配疏密测试1000-100](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\Join数据匹配疏密测试1000-100.png)
 
-**b. 左表10000条数据，右表1000条数据，不同疏密程度耗时**
+**b. 左表10000条数据，右表1000条数据，不同疏密程度10次运行耗时**
 
 ![Join数据匹配疏密测试10000-1000](C:\Users\huo00\OneDrive\Documents\dev-environment\home\concurrency-assignment-yqin7\test plot\Join数据匹配疏密测试10000-1000.png)
 

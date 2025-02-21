@@ -81,24 +81,41 @@
 
 ##### a. 基本测试
 
-- 编译 dinodb_stress
+- 编译三个二进制文件
 
 ```go
+# 编译服务器端
+go build -buildvcs=false -o dinodb ./cmd/dinodb
+
+# 编译客户端
+go build -buildvcs=false -o dinodb_client ./cmd/dinodb_client
+
+# 编译压力测试工具
 go build -buildvcs=false -o dinodb_stress ./cmd/dinodb_stress
 ```
 
-- 测试命令
+- 单个竞态文件测试命令
 
 ``` go
 ./dinodb_stress -index=btree -workload=workloads/i-a-sm.txt -n=8 -verify
 ```
 
-​       workload 文件类型：
+- workload 文件类型：
 
-- i-a-sm.txt: 顺序小数据集 (ascending, small)
-- i-i-sm.txt: 乱序小数据集 (inconsecutive, small)
-- i-a-lg.txt: 顺序大数据集 (ascending, large)
-- i-i-lg.txt: 乱序大数据集 (inconsecutive, large)
+  - i-a-sm.txt: 顺序小数据集 (ascending, small)
+
+  - i-i-sm.txt: 乱序小数据集 (inconsecutive, small)
+
+  - i-a-lg.txt: 顺序大数据集 (ascending, large)
+
+  - i-i-lg.txt: 乱序大数据集 (inconsecutive, large)
+
+
+- 完全测试测试命令
+
+```
+go test './test/concurrency/...' -race -timeout 180s -v
+```
 
 ##### b. 正确性验证
 
