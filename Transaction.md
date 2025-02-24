@@ -589,7 +589,8 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 **命令执行流程**
 
 ```go
-       ┌───────────────────┐
+
+             ┌───────────────────┐
                       │ 用户输入命令        │
                       │ find 1 from test  │
                       └─────────┬─────────┘
