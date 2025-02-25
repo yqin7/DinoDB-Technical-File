@@ -107,7 +107,7 @@ func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error) { ... }
 func (index *BTreeIndex) Insert(key int64, value int64)
 ```
 
-### A. 参数介绍
+#### A. 参数介绍
 
 - 参数：
   - key - 要插入的键
@@ -131,8 +131,10 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 1. 叶子节点插入和分裂
 
-- 调用链：`LeafNode[key3,key4].insert(5) -> LeafNode.split()`
-- 分裂结果：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`，**这里返回的Split信息是上一层内部节点中插入的新的分隔键和指针（子节点页号）**
+   - 调用链：`LeafNode[key3,key4].insert(5) -> LeafNode.split()`
+
+   - 分裂结果：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`，**这里返回的Split信息是上一层内部节点中插入的新的分隔键和指针（子节点页号）**
+
 
 ```
 叶子层分裂：[key3,key4] -> [key3,key4,key5] -> [key3] | [key4,key5]
@@ -145,19 +147,23 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 2. 内部节点处理分裂
 
-- 收到叶子节点的分隔键和指针信息：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`
+   - 收到叶子节点的分隔键和指针信息：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`
 
-- 在 [key2,key3] 中**插入 key4，插入指向叶子节点分裂信息中rightPN的指针（子节点页号）**
 
-- 内部节点变为 [key2,key3,key4]
+   - 在 [key2,key3] 中**插入 key4，插入指向叶子节点分裂信息中rightPN的指针（子节点页号）**
 
-  ```
-        [ key2  key3   key4 ]   
-        /     |      |      \
-  [key1]->[key2]->[key3]->[key4,key5]   
-  ```
 
-- 因超过节点最大容量（degree=3时最多2个键），需要分裂
+   - 内部节点变为 [key2,key3,key4]
+
+     ```
+           [ key2  key3   key4 ]   
+           /     |      |      \
+     [key1]->[key2]->[key3]->[key4,key5]   
+     ```
+
+
+   - 因超过节点最大容量（degree=3时最多2个键），需要分裂
+
 
 3. 内部节点分裂（见图片）
 
@@ -193,17 +199,23 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 4. 组装新的根节点
 
-- 因为是根节点分裂，需要创建新的根节点
+   - 因为是根节点分裂，需要创建新的根节点
 
-- 特殊处理：根节点必须保持在页面0
 
-- page 0保存key3
+   - 特殊处理：根节点必须保持在页面0
 
-- 到page0保存指向key2页面和key4页面的指针
 
-- 更新numKeys
+   - page 0保存key3
 
-- 最终树组装完成👇
+
+   - 到page0保存指向key2页面和key4页面的指针
+
+
+   - 更新numKeys
+
+
+   - 最终树组装完成👇
+
 
 
 ```go
