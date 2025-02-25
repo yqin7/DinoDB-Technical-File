@@ -167,7 +167,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
    - 因超过节点最大容量（degree=3时最多2个键），需要分裂
 
 
-3. 内部节点分裂（见图片）
+3. 内部节点分裂（见图示）
 
    - 调用链：`InternalNode.split()`
 
@@ -228,13 +228,19 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 ![b_tree_insert](./images/b_tree_insert.jpg)
 
-#### 2.2.2 Select
+### 2.2.2 Select
 
 ```go
 func (index *BTreeIndex) Select() ([]entry.Entry, error)
 ```
 
-**目的：查询所有entries**
+#### **A. 参数介绍**
+
+- 参数：无
+- 返回：
+  - []entry.Entry - 包含B+树中所有条目的切片，按键排序
+  - error - 可能的错误，如获取游标失败、读取条目失败等
+- 目的：返回B+树中所有条目，按键顺序排列
 
 以遍历整棵树为例，初始结构:
 
@@ -246,43 +252,45 @@ func (index *BTreeIndex) Select() ([]entry.Entry, error)
 [key1]->[key2]->[key3]->[key4,key5]
 ```
 
-##### **A. 遍历过程的调用链**
+#### **B. 遍历过程的调用链**
 
 1. `BTreeIndex.Select()`
 2. -> `BTreeIndex.CursorAtStart()`
 3. -> `BTreeCursor.GetEntry()` + `BTreeCursor.Next()`循环
 
-##### **B. 完整流程**
+#### **C. 完整流程**
 
-**1. 获取起始位置的游标** 
-
-调用链： `CursorAtStart() -> 从根向左遍历 -> 到达最左叶子节点`
+1. 获取起始位置的游标 
+   - 调用链： `CursorAtStart() -> 从根向左遍历 -> 到达最左叶子节点`
 
 ```
-        [key3]         
+         [key3]         
           /               从根开始
       [key2]              向左遍历      
       /     
 [key1]->                  到达最左叶子
 ```
 
-**2. 遍历所有叶子节点数据**
+2. 遍历所有叶子节点数据
 
-创建动态切片 entries 存储结果
+   - 创建动态切片 entries 存储结果
 
-循环处理:
+   - 循环处理:
 
-- `cursor.GetEntry()` 获取当前条目
+     - `cursor.GetEntry()` 获取当前条目
 
-- 添加到结果集 `entries = append(entries, entry)`
 
-- `cursor.Next()` 移动到下一个条目。这里分为游标在节点内或者节点间移动。节点间移动只需要将curIndex++即可。在节点间移动通过右邻居页号找到下一个节点，并初始化新起点的位置。
+     - 添加到结果集 `entries = append(entries, entry)`
 
-**3. 返回结果**
 
-- 最终结果为动态切片 entries，包含所有叶子节点的键值对
+     - `cursor.Next()` 移动到下一个条目。这里分为游标在节点内或者节点间移动。节点间移动只需要将curIndex++即可。在节点间移动通过右邻居页号找到下一个节点，并初始化新起点的位置。
 
-#### 2.2.3 SelectRange
+
+3. 返回结果
+   - 最终结果为动态切片 entries，包含所有叶子节点的键值对
+
+
+### 2.2.3 SelectRange
 
 ```go
 func (index *BTreeIndex) SelectRange(startKey int64, endKey int64) ([]entry.Entry, error)
@@ -345,7 +353,7 @@ func (index *BTreeIndex) SelectRange(startKey int64, endKey int64) ([]entry.Entr
 
 - 最终结果和Select类似为动态切片，包含特定范围的entries
 
-#### 2.2.4 find
+### 2.2.4 find
 
 ```go
 func (index *BTreeIndex) Find(key int64) (entry.Entry, error)
@@ -406,7 +414,7 @@ func (index *BTreeIndex) Find(key int64) (entry.Entry, error)
 
 - 未找到：返回错误 "no entry with key %d was found"
 
-#### 2.2.5 update
+### 2.2.5 update
 
 ```go
 func (index *BTreeIndex) Update(key int64, value int64) error
