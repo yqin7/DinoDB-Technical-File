@@ -1,8 +1,8 @@
 # B+ Tree
 
-## 1. 重要关系
+# 1. 重要关系
 
-### **1.1 本项目中B+树度数(degree)为202,具体规则如下:**
+## **1.1 本项目中B+树度数(degree)为202,具体规则如下:**
 
 - 每个非叶子节点最多有201个key索引和202个子节点(page)，每个叶子节点最多存201个key - value键值对，计算规则见3.2
 - 每个非叶子节点(内部节点)至少有⌈203/2⌉个子节点
@@ -21,9 +21,9 @@
    ------>----->----->--->--->---->  <- 叶子节点链表（单向链表）    <---
 ```
 
-### 1.2 重要Helper Function
+# 1.2 重要Helper Function
 
-#### 1.2.1 getKeyAt
+### 1.2.1 getKeyAt
 
 - 输入index后，由于每个key_size相同，因此我们可以通过对数据切片获取数据
 - 类似对页数据的读取和修改的function都是通过这种切片的方法
@@ -53,9 +53,9 @@ func (node *InternalNode) getKeyAt(index int64) int64 {
 
 
 
-## 2. BtreeIndex B+树索引
+# 2. BtreeIndex B+树索引
 
-### 2.1 结构体
+## 2.1 结构体
 
 1. 包含了页管理器和初始化的root Page Number = 0。
 
@@ -99,9 +99,9 @@ func (index *BTreeIndex) PrintPN(pagenum int, w io.Writer) { ... }
 func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error) { ... }
 ```
 
-### 2.2. BtreeIndex Function
+## 2.2. BtreeIndex Function
 
-#### 2.2.1 Insert
+### 2.2.1 Insert
 
 ```go
 func (index *BTreeIndex) Insert(key int64, value int64)
@@ -112,16 +112,16 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 以插入 key5 为例，初始结构
 
                [key2,key3]
-              /    |     \
+              /     |     \
         [key1]->[key2]->[key3,key4]
 
-##### **A. 插入过程的调用链**
+#### **A. 插入过程的调用链**
 
 1. `BTreeIndex.Insert(5)`
 2. -> `InternalNode[key2,key3].insert(5)`
 3. -> `LeafNode[key3,key4].insert(5)`
 
-##### **B. 完整流程**  
+#### **B. 完整流程**  
 
 **1. 叶子节点插入和分裂**
 
@@ -133,7 +133,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 分裂后：
            [key2,key3]
-          /    |     \
+          /     |     \
     [key1]->[key2]->[key3]->[key4,key5]   
 ```
 
@@ -350,12 +350,18 @@ func (index *BTreeIndex) Find(key int64) (entry.Entry, error)
 ##### **A. 查找过程的调用链**
 
 1. `BTreeIndex.Find()`
-2. -> `Node.get()` （接口多态，实际执行的是内部节点或叶子节点的 get 方法）
+2. -> `Node.get()` （接口多态，实际执行的是内部节点或叶子节点的 `get` 方法）
 3. -> 递归调用直到叶子节点
 
 ##### **B. 完整流程** 
 
-**1. 从根节点开始查找**
+**1. 获取根节点**
+
+- `index.pager.GetPage(index.rootPN)` 获取根页面`rootPage`(永远在页面0)，将根页面`rootPage`转换为根节点`rootNode`
+
+**2. 从根节点开始查找**
+
+- `rootNode.get(key)`接口多态执行内部节点或者叶子节点`get`方法。
 
 ```
        [key3]         
@@ -365,13 +371,22 @@ func (index *BTreeIndex) Find(key int64) (entry.Entry, error)
         [key3]->[key4,key5]   找到目标叶子节点
 ```
 
-**2. 在叶子节点中定位** 
+**3. 在内部节点中定位**
 
-- `node.search(key)`，二分查找定位位置
+- `node.search(key)`，二分查找定位位置，使用二分查找找到第一个大于 key 的位置`childIndex`
+- 调用`getAndLockChildAt(childindex)`
+  - 通过childIndex获得子节点的的页号，再从页面管理器获得该页
+  - 将页面转换为子节点
+
+- 递归向下再次调用`child.get(key)`，直到到达叶子节点
+
+**4. 在叶子节点中定位** 
+
+- `node.search(key)`，二分查找定位位置，定位到key的位置
 
 - `node.getEntry(index)` 获取条目
 
-**3. 返回结果**
+**5. 返回结果**
 
 - 找到：返回对应的 Entry
 
