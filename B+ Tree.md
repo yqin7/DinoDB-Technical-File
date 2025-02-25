@@ -21,7 +21,7 @@
    ------>----->----->--->--->---->  <- 叶子节点链表（单向链表）    <---
 ```
 
-# 1.2 重要Helper Function
+## 1.2 重要Helper Function
 
 ### 1.2.1 getKeyAt
 
@@ -107,7 +107,13 @@ func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error) { ... }
 func (index *BTreeIndex) Insert(key int64, value int64)
 ```
 
-**目的：插入entry键值对**
+### A. 参数介绍
+
+- 参数：
+  - key - 要插入的键
+  - value - 要插入的值
+- 返回：err - 可能返回的错误包括：插入重复键、页面分配失败、根节点分裂异常等，插入成功返回nil
+- 目的：向B+树索引中插入entry键值对
 
 以插入 key5 为例，初始结构
 
@@ -115,21 +121,21 @@ func (index *BTreeIndex) Insert(key int64, value int64)
               /     |     \
         [key1]->[key2]->[key3,key4]
 
-#### **A. 插入过程的调用链**
+#### **B. 插入过程的调用链**
 
 1. `BTreeIndex.Insert(5)`
 2. -> `InternalNode[key2,key3].insert(5)`
 3. -> `LeafNode[key3,key4].insert(5)`
 
-#### **B. 完整流程**  
+#### **C. 完整流程**  
 
-**1. 叶子节点插入和分裂**
+1. 叶子节点插入和分裂
 
 - 调用链：`LeafNode[key3,key4].insert(5) -> LeafNode.split()`
 - 分裂结果：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`，**这里返回的Split信息是上一层内部节点中插入的新的分隔键和指针（子节点页号）**
 
 ```
-[key3,key4] -> [key3,key4,key5] -> [key3] | [key4,key5]
+叶子层分裂：[key3,key4] -> [key3,key4,key5] -> [key3] | [key4,key5]
 
 分裂后：
            [key2,key3]
@@ -137,7 +143,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
     [key1]->[key2]->[key3]->[key4,key5]   
 ```
 
-**2. 内部节点处理分裂**
+2. 内部节点处理分裂
 
 - 收到叶子节点的分隔键和指针信息：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`
 
@@ -153,41 +159,39 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
 - 因超过节点最大容量（degree=3时最多2个键），需要分裂
 
-**3. 内部节点分裂（见图片）**
+3. 内部节点分裂（见图片）
 
    初始状态：
 
-- 键：`[key2,key3,key4]`
-- 指针：`[page1,page2,page3,page4]`
+   - 键：`[key2,key3,key4]`
+   - 指针：`[page1,page2,page3,page4]`
 
    分裂过程：
 
-1. 计算分裂点
+   a. 计算分裂点
 
-   - `midpoint = (3-1)/2 = 1`，即 key3 的位置
+      - `midpoint = (3-1)/2 = 1`，即 key3 的位置
 
-2. 创建新节点并转移数据，新的节点
+   b. 创建新节点并转移数据，新的节点
 
-      ```go
-          [key4]
-         /      \
-      [key3]->[key4 key5]
-      ```
+   ```
+       [key4]
+      /      \
+   [key3]->[key4 key5]
+   ```
 
-3. 原节点数据处理
+   c. 原节点数据处理
 
-   - 执行 `node.updateNumKeys(midpoint)`，设置键数量为1
-   - 数据特点：
-     - 页中实际数据仍然是 `[key2,key3,key4]`
-     - 因为 numKeys=1，只能访问到 key2
-     - key3, key4 和其指向的节点虽然物理存在，但逻辑上不可访问
-     - 这些"不可见"数据区域会在将来被新数据覆盖
+      - 执行 `node.updateNumKeys(midpoint)`，设置键数量为1
+      - 数据特点：
+        - 页中实际数据仍然是 `[key2,key3,key4]`
+        - 因为 numKeys=1，只能访问到 key2
+        - key3, key4 和其指向的节点虽然物理存在，但逻辑上不可访问
+        - 这些"不可见"数据区域会在将来被新数据覆盖
 
-4. 分裂结果
+   d. 分裂结果 `Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}`，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
 
-   Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
-
-**4. 组装新的根节点**
+4. 组装新的根节点
 
 - 因为是根节点分裂，需要创建新的根节点
 
@@ -210,7 +214,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 [key1]->[key2]->[key3]->[key4,key5]
 ```
 
-**5. 图示**
+5. 图示
 
 ![b_tree_insert](./images/b_tree_insert.jpg)
 

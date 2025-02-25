@@ -202,7 +202,7 @@ func (tm *TransactionManager) Lock(clientId uuid.UUID, table database.Index, res
 
 ### A. 参数介绍
 
-- 参数
+- 参数：
   - clientId - 客户端的唯一标识符
   - table - 数据库索引
   - resourceKey - 要锁定的数据库索引的key
@@ -292,7 +292,7 @@ func (tm *TransactionManager) Unlock(clientId uuid.UUID, table database.Index, r
 
 ### **A. 参数介绍**
 
-- 参数
+- 参数：
   - clientId - 客户端的唯一标识符
   - table - 数据库索引
   - resourceKey - 要解锁的数据库索引的key
@@ -351,7 +351,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 
 ### **A. 参数介绍**
 
-- 参数
+- 参数：
   - clientId - 客户端的唯一标识符
 - 返回 err - 如果事务未找到、释放资源锁失败返回错误，否则返回nil
 - 目的：提交事务，释放事务持有的所有锁，并从事务管理器中移除该事务
@@ -389,7 +389,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 
 ### **A. 参数介绍**
 
-- 参数
+- 参数：
   - clientId - 客户端的唯一标识符
 - 返回 err - 如果事务未找到、释放资源锁失败返回错误，否则返回nil
 - 目的：回滚事务，释放事务持有的所有锁，并从事务管理器中移除该事务（与Commit类似，但语义上表示事务失败）
