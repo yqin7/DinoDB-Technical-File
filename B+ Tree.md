@@ -784,14 +784,15 @@ func (node *InternalNode) split() (Split, error)
        rightPN: newNode.page.GetPageNum(),  // 包含key4的页号
    }
    ```
-
-- 分裂结果说明：
-
-  - 左节点（原节点）：`[key2]`，指针：`[page1,page2]`
-
-  - 提升键：`key3`
-
-  - 右节点（新节点）：`[key4]`，指针：`[page3,page4]`
+   
+   - 分裂结果说明：
+   
+     - 左节点（原节点）：`[key2]`，指针：`[page1,page2]`
+   
+     - 提升键：`key3`
+   
+     - 右节点（新节点）：`[key4]`，指针：`[page3,page4]`
+   
 
 
 ## 4. LeafNode
