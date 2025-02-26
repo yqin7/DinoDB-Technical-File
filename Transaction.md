@@ -639,10 +639,6 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
                       └───────────────────┘
 ```
 
-
-
-
-
 # 4. 存在的问题
 
 ## 4.1 压力测试中的死锁问题

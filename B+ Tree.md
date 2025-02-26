@@ -132,7 +132,7 @@ type Split struct {
 
 - Split结构体在节点分裂时用于向上传递分裂信息。当一个节点分裂时，它会返回一个包含分隔键和两个子节点页号的Split结构体，供父节点处理分裂并更新指针关系。这种设计实现了B+树自底向上的分裂机制，确保树结构始终保持平衡。
 
-### 2.1.2 Node 接口
+### 2.1.2 Node接口
 
 ```go
 type Node interface {
@@ -1028,34 +1028,56 @@ type BTreeCursor struct {
 }
 ```
 
-### 5.2 BTreeCursor Function
+## 5.2 BTreeCursor Function
 
-#### 5.2.1 CursorAtStart
+### 5.2.1 CursorAtStart
 
 ```go
 func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error)
 ```
 
-**目的：创建一个指向 B+ 树最左侧叶子节点第一个条目的游标，为顺序遍历做准备。**
+#### **A. 参数介绍**
 
-**1. 获取根节点**：
+- 参数：无
+- 返回：
+  - cursor.Cursor - 指向B+树第一个条目的游标接口
+  - error - 可能的错误，如获取页面失败或所有叶子节点为空
+- 目的：创建一个指向B+树最左侧叶子节点第一个条目的游标，为顺序遍历做准备
 
-- 通过页面管理器获取根页面(index.rootPN = 0)
-- 转换为节点格式
+#### **B. 调用链与调用时机**
 
-**2. 向左遍历直至叶子节点**：
+1. 主要由`BTreeIndex.Select()`调用，用于初始化B+树的顺序遍历
 
-- 从根节点开始循环向下遍历
-- 每次获取最左子节点(索引0位置的子页号)
-- 直到遇到叶子节点类型为止
+2. 按键值升序获取所有条目时使用
 
-**3. 创建并返回游标**：
+#### C. 完整流程
 
-- 初始化游标，将 curNode 指向找到的叶子节点
-- 设置 curIndex = 0 指向第一个条目
-- 如果是空节点，尝试移动到下一个非空节点
+1. 获取根节点：
 
-**4. 返回结构体字段**
+   - 通过页面管理器获取根页面(index.rootPN = 0)
+
+   - 转换为节点格式
+
+
+2. 向左遍历直至叶子节点：
+
+   - 从根节点开始循环向下遍历
+
+   - 每次获取最左子节点(索引0位置的子页号)
+
+   - 直到遇到叶子节点类型为止
+
+
+3. 创建并返回游标：
+
+   - 初始化游标，将 curNode 指向找到的叶子节点
+
+   - 设置 curIndex = 0 指向第一个条目
+
+   - 如果是空节点，尝试移动到下一个非空节点
+
+
+4. 返回游标：
 
 ```go
 cursor := &BTreeCursor{
@@ -1065,68 +1087,129 @@ cursor := &BTreeCursor{
 }
 ```
 
-#### 5.2.2 Next
+### 5.2.2 Next
 
 ```go
 func (cursor *BTreeCursor) Next() (atEnd bool)
 ```
 
-**目的：将游标移动到下一个条目，可以是同一节点内移动，也可以是跨节点移动。通过 rightSiblingPN 实现叶子节点间的顺序遍历。**
+#### **A. 参数介绍**
 
-**1. 节点内移动**：
+- 参数：无
+- 返回：
+  - atEnd bool - 如果已到达B+树末尾返回true，否则返回false
+- 目的：将游标移动到下一个条目，可以是同一节点内移动，也可以是跨节点移动，通过rightSiblingPN 实现叶子节点间的顺序遍历。
 
-- 如果 curIndex+1 < numKeys，直接增加索引
+#### **B. 调用链与调用时机**
 
-**2. 节点间移动**：
+1. 由`BTreeIndex.Select()`和`BTreeIndex.SelectRange()`在遍历过程中调用
 
-- 获取右兄弟节点页号(rightSiblingPN)
+2. 由`BTreeCursor.CursorAtStart()`在处理空节点时调用
 
-- 如果没有右兄弟(页号<0)，表示到达末尾
+#### **C. 完整流程**
 
-- 否则切换到右兄弟节点并重置 curIndex = 0
+1. 检查是否需要移动到下一个节点: 
+   - 如果`curIndex + 1 >= curNode.numKeys`，当前节点已遍历完
+   - 获取右兄弟节点的页号`nextPN = curNode.rightSiblingPN`
+   - 如果没有右兄弟(页号<0)，返回true表示到达末尾
 
-  **返回 true 的情况**：
+2. 节点内移动：
+   - 如果 curIndex+1 < numKeys，直接增加索引
 
-  - 当前节点没有右兄弟节点(rightSiblingPN < 0)，表示已到达最右叶子节点的末尾
-  - 获取下一个节点页面失败时，视为到达末尾
 
-  **返回 false 的情况**：
+3. 节点间移动：
 
-  - 在当前节点内移动成功（curIndex++)
-  - 成功切换到右兄弟节点并重置位置（curIndex = 0）
+   - 获取右兄弟节点页号(rightSiblingPN)
 
-#### 5.2.3 GetEntry
+
+   - 如果没有右兄弟(页号<0)，表示到达末尾
+
+
+   - 否则切换到右兄弟节点并重置 curIndex = 0
+
+
+4. 返回值
+
+   - 返回true的情况：
+     - 当前节点没有右兄弟节点(rightSiblingPN < 0)
+     - 获取下一个节点页面失败
+
+   - 返回false的情况：
+     - 在当前节点内移动成功(curIndex++)
+     - 成功切换到右兄弟节点
+
+### 5.2.3 GetEntry
 
 ```go
 func (cursor *BTreeCursor) GetEntry() (entry.Entry, error)
 ```
 
-**目的：获取游标当前位置的条目数据，同时进行边界检查确保访问安全。**
+#### **A. 参数介绍**
 
-**1. 边界检查**：
+- 参数：无
+- 返回：
+  - entry.Entry - 游标当前位置的条目
+  - error - 可能的错误，如游标位置无效或节点为空
+- 目的：获取游标当前位置的条目数据，同时进行边界检查确保访问安全
 
-- 检查 curIndex 是否超过 numKeys
-- 检查节点是否为空节点
+#### **B. 调用链与调用时机**
 
-**2. 获取数据**：
+1. 由`BTreeIndex.Select()`和`BTreeIndex.SelectRange()`在遍历每个条目时调用
 
-- 返回 curNode 中 curIndex 位置的条目
+2. 在查询操作中获取实际数据
 
-#### 5.2.4 CursorAt
+#### **C. 完整流程**
+
+1. 边界检查：
+   - 检查`curIndex > curNode.numKeys`是否成立，若成立则返回错误
+   - 检查节点是否为空(`curNode.numKeys == 0`)，若为空则返回错误
+2. 获取数据：
+   - 调用`curNode.getEntry(curIndex)`获取条目
+   - 返回条目数据和nil错误
+
+3. 返回值：
+
+   - 成功情况：
+     - 返回`entry.Entry{Key: key, Value: value}, nil`，包含游标当前位置的键值对
+
+   - 错误情况：
+
+     - 索引越界：`entry.Entry{}, errors.New("getEntry: cursor is not pointing at a valid entry")`
+
+     - 空节点：`entry.Entry{}, errors.New("getEntry: cursor is in an empty node :(")`
+
+### 5.2.4 CursorAt
 
 ```
 func (index *BTreeIndex) CursorAt(key int64) (cursor.Cursor, error)
 ```
 
-**目的：返回指定key的cursor结构体游标, 即找到指定 key 在 B+ 树中的位置，或者找不到时定位到下一个更大的 key。**
+#### **A. 参数介绍**
 
-**1. 获得根节点，页面0的位置**
+- 参数：
+  - key int64 - 要查找的键值
+- 返回：
+  - cursor.Cursor - 指向找到的键位置或下一个更大键的游标
+  - error - 可能的错误，如获取页面失败
+- 目的：返回指向指定key的游标或找不到时指向下一个更大key的游标
 
-**2. for循环获得key所在叶子节点的位置**
+#### **B. 调用链与调用时机**
 
-- 这里用节点是否为internalNode作为for控制条件。如果是internalNode继续向下查找；如果找到非internalNode就是叶子节点，则停止查找
+1. 主要由`BTreeIndex.SelectRange()`调用，用于定位范围查询的起始位置
 
-**3. 创建游标结构体**
+2. 按指定范围查询条目时使用
+
+#### **C. 完整流程**
+
+1. 获取根节点：
+   - 通过页面管理器获取根页面并加读锁
+   - 转换为节点格式
+2. 查找包含目标key的叶子节点：
+   - 使用for循环从根向下遍历
+   - 在每个内部节点使用`search(key)`二分查找确定要走的子节点路径
+   - 直到到达叶子节点(非InternalNode)
+
+3. 创建游标结构体
 
 ```go
 cursor := &BTreeCursor{
@@ -1136,7 +1219,21 @@ cursor := &BTreeCursor{
 }
 ```
 
-**4. 处理 key 不在当前节点的情况**
+4. 处理 key 不在当前节点的情况
 
-- 由于前面在内部节点search时，如果查找的叶子节点刚好也是内部节点索引的情况都返回左子树索引（具体见源代码注释的例子）
-- 调用cursor.Next()移动到下一个叶子节点
+   - 如果`curIndex >= curNode.numKeys`，表示key不在当前节点
+
+   - 调用cursor.Next()移动到下一个叶子节点
+
+5. 返回值
+
+   - 成功情况：
+
+     - 返回`cursor.Cursor`接口，实际类型为`*BTreeCursor`，指向包含目标key的位置
+
+     - 如果目标key不存在，则指向下一个更大key的位置
+
+    - 错误情况：
+      - 获取页面失败：`nil, err`
+      - 遍历过程中出现其他错误：`nil, err`
+   
