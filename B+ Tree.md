@@ -41,8 +41,6 @@
 
   - 三层B+树：201 × 202² = 8,201,604个键值对
 
-
-
 ## 1.3 重要Helper Function
 
 ### 1.3.1 getKeyAt
@@ -73,19 +71,11 @@ func (node *InternalNode) getKeyAt(index int64) int64 {
 }
 ```
 
+# 2. B+树索引
 
+## 2.1 相关结构体介绍
 
-# 2. BtreeIndex B+树索引
-
-## 2.1 结构体
-
-1. 包含了页管理器和初始化的root Page Number = 0。
-
-2. 这里的BTreeIndex是Index接口的实现。BtreeIndex实现了Index接口所有的方法。在go中，只要一个类型实现接口定义的所有方法，它就隐式自动实现了这个接口，并不需要关心实现类的参数attributes有哪些。
-
-   Java：显式implements实现接口，实现类实现接口所有方法，不同的实现类可以有不同的参数。
-
-   Go：隐式实现接口，实现类实现接口所有方法，不同的实现类可以有不同的参数。
+### 2.1.1 BTreeIndex 结构体
 
 ```go
 // Index 接口定义的方法
@@ -121,7 +111,44 @@ func (index *BTreeIndex) PrintPN(pagenum int, w io.Writer) { ... }
 func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error) { ... }
 ```
 
-## 2.2. BtreeIndex Function
+- 包含了页管理器和初始化的root Page Number = 0。
+
+- 这里的BTreeIndex是Index接口的实现。BtreeIndex实现了Index接口所有的方法。在go中，只要一个类型实现接口定义的所有方法，它就隐式自动实现了这个接口，并不需要关心实现类的参数attributes有哪些。
+
+- Java：显式implements实现接口，实现类实现接口所有方法，不同的实现类可以有不同的参数。
+
+- Go：隐式实现接口，实现类实现接口所有方法，不同的实现类可以有不同的参数。
+
+### 2.1.2 Split 结构体
+
+```
+type Split struct {
+    isSplit bool  // 标志是否发生了分裂
+    key     int64 // 需要上推到父节点的中间键
+    leftPN  int64 // 左子节点的页号
+    rightPN int64 // 右子节点的页号
+}
+```
+
+- Split结构体在节点分裂时用于向上传递分裂信息。当一个节点分裂时，它会返回一个包含分隔键和两个子节点页号的Split结构体，供父节点处理分裂并更新指针关系。这种设计实现了B+树自底向上的分裂机制，确保树结构始终保持平衡。
+
+### 2.1.2 Node 接口
+
+```go
+type Node interface {
+    insert(key int64, value int64, update bool) (Split, error)
+    delete(key int64)
+    get(key int64) (value int64, found bool)
+    search(searchKey int64) int64
+    printNode(io.Writer, string, string)
+    getPage() *pager.Page
+    getNodeType() NodeType
+}
+```
+
+- Node接口定义了内部节点和叶子节点共享的基本操作，并由InternalNode和LeafNode结构体实现，支持Go语言的多态特性。
+
+## 2.2 BtreeIndex Function
 
 ### 2.2.1 Insert
 
@@ -216,9 +243,9 @@ func (index *BTreeIndex) Insert(key int64, value int64)
        - 因为 numKeys=1，只能访问到 key2
        - key3, key4 和其指向的节点虽然物理存在，但逻辑上不可访问
        - 这些"不可见"数据区域会在将来被新数据覆盖
-   
-   
-     d. 分裂结果 `Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}`，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
+     
+     
+       d. 分裂结果 `Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}`，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
    
 4. 组装新的根节点
 
@@ -303,12 +330,8 @@ func (index *BTreeIndex) Select() ([]entry.Entry, error)
    - 循环处理:
 
      - `cursor.GetEntry()` 获取当前条目
-
-
      - 添加到结果集 `entries = append(entries, entry)`
-
-
-     - `cursor.Next()` 移动到下一个条目。这里分为游标在节点内或者节点间移动。节点间移动只需要将curIndex++即可。在节点间移动通过右邻居页号找到下一个节点，并初始化新起点的位置。
+     - `cursor.Next()` 移动到下一个条目。这里分为游标在节点内或者节点间移动。节点间移动只需要将curIndex++即可。在节点间移动通过右邻居页号找到下一个节点，并初始化新起点的位置。 
 
 
 3. 返回结果
@@ -374,15 +397,11 @@ func (index *BTreeIndex) SelectRange(startKey int64, endKey int64) ([]entry.Entr
    - 循环处理直到遇到 endKey 或 B+ 树末尾：
 
      - `cursor.GetEntry()` 获取当前条目
-
-
      - 检查是否到达区间末尾（endKey > checkEntry.Key）
-
-
      - 如未到达末尾：
-    
+     
        - 添加到结果集
-    
+     
        - `cursor.Next()` 移动到下一个位置
 
 
@@ -446,25 +465,28 @@ func (index *BTreeIndex) Find(key int64) (entry.Entry, error)
    - 调用`getAndLockChildAt(childindex)`
      - 通过childIndex获得子节点的的页号，再从页面管理器获得该页
      - 将页面转换为子节点
-
-
-   - 递归向下再次调用`child.get(key)`，直到到达叶子节点
+   
+   
+      - 递归向下再次调用`child.get(key)`，直到到达叶子节点
+   
 
 
 4. 在叶子节点中定位 
 
    - `node.search(key)`，二分查找定位位置，定位到key的位置
-
-
-   - `node.getEntry(index)` 获取条目
+   
+   
+      - `node.getEntry(index)` 获取条目
+   
 
 
 5. 返回结果
 
    - 找到：返回对应的 Entry
-
-
-   - 未找到：返回错误 "no entry with key %d was found"
+   
+   
+      - 未找到：返回错误 "no entry with key %d was found"
+   
 
 
 ### 2.2.5 update
@@ -649,10 +671,11 @@ func (node *InternalNode) insert(key int64, value int64, update bool) (Split, er
    - 到返回Split结构体就已经结束，后面由`btreeIndex.insert()`函数完成新的树的组装。
 
 6. 返回结果：
+   - 子节点插入成功且未分裂：返回 `Split{}, nil`
+   - 子节点插入导致分裂，但当前节点插入分隔键后未分裂：返回 `Split{}, nil`
+   - 子节点分裂导致当前节点也需分裂：返回 `Split{isSplit: true, key: 提升的键, leftPN: 左子节点页号, rightPN: 右子节点页号}, nil`
+   - 子节点插入失败：返回子节点返回的错误 `Split{}, childErr`
 
-   - 如果有分裂，返回分裂信息给上一级节点处理
-
-   - 如果没有分裂，返回空的Split结构体和nil错误
 
 ### 3.3.2 InsertSplit
 
@@ -790,14 +813,13 @@ func (node *InternalNode) split() (Split, error)
      - 右节点（新节点）：`[key4]`，指针：`[page3,page4]`
    
 
+# 4. LeafNode
 
-## 4. LeafNode
+## 4.1 LeafNode (叶子节点) 存储布局
 
-### 4.1 LeafNode (叶子节点) 存储布局
+- 假设一个包含3个键值对的叶子节点：`(5,100), (8,200), (12,300)`
 
-假设一个包含3个键值对的叶子节点：`(5,100), (8,200), (12,300)`
-
-**一个page 4KB**
+- 一个page 4KB
 
 ```css
 +------------------------+  偏移量
@@ -815,7 +837,7 @@ func (node *InternalNode) split() (Split, error)
 +------------------------+  LEAF_NODE_HEADER_SIZE + 3*ENTRYSIZE
 ```
 
-访问叶子节点数据的代码示例：
+- 访问叶子节点数据的代码示例：
 
 ```go
 // 获取键值对的位置
@@ -831,7 +853,7 @@ entry := entry.UnmarshalEntry(page.GetData()[entryPos : entryPos+ENTRYSIZE])
 // entry.Value = 100, 200, 或 300
 ```
 
-### 4.2 每个叶子节点包含多少键值对公式
+## 4.2 每个叶子节点包含多少键值对公式
 
 ```go
 ENTRIES_PER_LEAF_NODE = ((pager.Pagesize - LEAF_NODE_HEADER_SIZE) / ENTRYSIZE) - 1
@@ -845,70 +867,118 @@ ENTRIES_PER_LEAF_NODE = ((pager.Pagesize - LEAF_NODE_HEADER_SIZE) / ENTRYSIZE) -
 
 **ENTRIES_PER_LEAF_NODE = ((4096 - 21) / (20)) - 1 = 202个，实际代码中第202个键会分裂，最多存储201个键**
 
-### 4.3 LeafNode Function
+## 4.3 LeafNode Function
 
-#### 4.3.1 Insert
+### 4.3.1 Insert
 
 ```go
 func (node *LeafNode) insert(key int64, value int64, update bool) (Split, error)
 ```
 
-1. **查找插入位置**：
+#### **A. 参数介绍**
+
+- 参数：
+  - key - 要插入或更新的键
+  - value - 要关联的值
+  - update - 操作模式标志（true=更新模式，false=插入模式）
+- 返回：
+  - Split - 如果发生节点分裂，返回分裂信息；否则返回空的Split结构体
+  - error - 可能的错误，包括：重复键错误（插入模式）、键不存在错误（更新模式）
+- 目的：在叶子节点中插入新的键值对或更新已存在键的值；如果节点已满，执行分裂操作并返回分裂信息供父节点处理
+
+#### **B. 插入过程调用链**
+
+1. `LeafNode.insert(key, value, update)` - 执行叶子节点插入操作
+2. -> 使用 `node.search(key)` 确定插入位置
+3. -> 如果需要插入新键，移动现有元素并插入
+4. -> 如果节点已满，调用 `node.split()` 执行分裂
+5. -> 返回分裂信息或操作结果
+
+#### C. 完整流程
+
+1. 查找插入位置：
+
    - 使用二分查找确定新键值对的插入位置 `insertPos`。
    - 示例：现有键值对 `[10, 20, 30]`，插入 `25` → `insertPos = 2`。
-2. **检查键是否存在**：
+
+2. 检查键是否存在：
    - 如果 `insertPos < numKeys` 且 `node.getKeyAt(insertPos) == key`，表示键已存在。
      - 如果 `update = true`，更新现有键的值调用node.updateValueAt()并返回成功。
      - 如果 `update = false`，返回重复键错误。
    - 如果键不存在且 `update = true`，返回键不存在错误。
-3. **插入新键值对**：
+
+3. 插入新键值对：
    - 从 `insertPos` 开始，将后续元素右移一位，腾出插入空间。
    - 在 `insertPos` 插入新条目。
    - 更新条目数量 `numKeys`。
-4. **检查是否需要分裂**：
-   - 如果 `numKeys >= ENTRIES_PER_LEAF_NODE(202)`，触发分裂操作：
-     - 创建新节点。
-     - 调整兄弟指针。
-     - 转移条目：将原节点后半部分条目复制到新节点。调用node.updateKeyAt()和node.updateValueAt()，这两个function直接更新页数据来更新节点数据。
-     - 调整条目数量：原节点保留前半部分，新节点获得后半部分。
-     - 返回分裂信息：包含新节点的第一个键、原节点和新节点的页码。
-   - 如果未分裂，返回成功。
+   - 注意：所有键值对操作直接修改页面数据，而非LeafNode结构体。通过 `updateKeyAt()`, `updateValueAt()`, `modifyEntry()` 等方法修改页面数据
 
-#### 4.3.2 Split
+4. 检查是否需要分裂：
+
+   - 如果 `numKeys >= ENTRIES_PER_LEAF_NODE`（默认202），触发分裂操作：
+     
+     - 调用 `node.split()` 执行分裂过程
+     - 返回分裂信息给父节点处理
+     
+     - 如果未分裂，返回成功（空的Split结构体和nil错误）
+
+5. 返回结果：
+   - 插入成功且未分裂：返回 `Split{}, nil`
+   - 插入导致分裂：返回 `Split{isSplit: true, key: 分隔键, leftPN: 原节点页号, rightPN: 新节点页号}, nil`
+   - 键已存在（非更新模式）：返回 `Split{}, errors.New("cannot insert duplicate key")`
+   - 键不存在（更新模式）：返回 `Split{}, errors.New("cannot update non-existent entry")`
+
+### 4.3.2 Split
 
 ```go
 func (node *LeafNode) split() (Split, error)
 ```
 
-1. **创建新叶子节点**：
+#### **A. 参数介绍**
+
+- 参数：无
+- 返回：
+  - Split - 包含分裂信息的结构体，包括提升键、左右子节点页号
+  - error - 可能的错误，主要是在创建新节点时的页面分配错误
+- 目的：将一个已满的叶子节点分裂成两个节点，迁移一半数据到新节点，维护B+树的横向叶子节点链表结构，并返回分裂信息供父节点处理
+
+#### B. 调用时机
+
+1. 调用时机：在叶子节点插入新键值对后，条目数量达到最大值(`ENTRIES_PER_LEAF_NODE`)时被调用
+
+2. 作为B+树自底向上分裂传递的起点
+
+#### C. 完整流程
+
+1. 创建新叶子节点：
 
    - 通过页管理器分配新页，调用 `createLeafNode(pager)` 初始化新节点。
-   - **错误处理**：若创建失败（如无可用页），返回错误。
-   - **资源释放**：通过 `defer pager.PutPage()` 确保新节点的页最终被释放。
+   - 错误处理：若创建失败（如无可用页），返回错误。
+   - 资源释放：通过 `defer pager.PutPage()` 确保新节点的页最终被释放。
 
-2. **调整兄弟指针**：
+2. 调整兄弟指针：
 
-   - **原节点右兄弟**：指向新节点（`newNode.page.GetPageNum()`）。
+   - 原节点右兄弟：指向新节点（`newNode.page.GetPageNum()`）。
 
-   - **新节点右兄弟**：继承原节点的旧右兄弟（`prevSiblingPN`）。
+   - 新节点右兄弟：继承原节点的旧右兄弟（`prevSiblingPN`）。
 
-   - **目的**：维护叶子节点的横向链表结构。
+   - 目的：维护叶子节点的横向链表结构。
 
      ```go
      prevSiblingPN := node.setRightSibling(newNode.page.GetPageNum())
      newNode.setRightSibling(prevSiblingPN)
      ```
 
-3. **计算分裂中点**：
+3. 计算分裂中点：
 
-   - **公式**：`midpoint := node.numKeys / 2`。
-   - **作用**：若原节点键数为偶数，分裂为两个相等节点；若为奇数，新节点多承载一个键。
+   - 公式：`midpoint := node.numKeys / 2`。
+   - 作用：若原节点键数为偶数，分裂为两个相等节点；若为奇数，新节点多承载一个键。
 
-4. **迁移条目到新节点**：
+4. 迁移条目到新节点：
 
-   - **循环范围**：从 `midpoint` 到 `node.numKeys - 1`。
+   - 循环范围：从 `midpoint` 到 `node.numKeys - 1`。
 
-   - **操作**：
+   - 操作：
 
      ```go
      for i := midpoint; i < node.numKeys; i++ {
@@ -918,20 +988,20 @@ func (node *LeafNode) split() (Split, error)
      }
      ```
 
-   - **底层数据操作**：
+   - 底层数据操作：
 
      - `updateKeyAt` 和 `updateValueAt` 直接修改新节点的页数据。
-     - **示例**：原节点 `[10:100, 20:200, 25:250, 30:300]` → 迁移后新节点 `[25:250, 30:300]`。
+     - 示例：原节点 `[10:100, 20:200, 25:250, 30:300]` → 迁移后新节点 `[25:250, 30:300]`。
 
-5. **更新原节点条目数**：
+5. 更新原节点条目数：
 
-   - **操作**：`node.updateNumKeys(midpoint)`。
-   - **目的**：原节点仅保留前半部分键值对，之后新的数据对后半部分的key和指针进行覆盖。
-   - **示例**：原节点 `numKeys` 从 `3` 更新为 `1`。
+   - 操作：`node.updateNumKeys(midpoint)`。
+   - 目的：原节点仅保留前半部分键值对，之后新的数据对后半部分的key和指针进行覆盖。
+   - 示例：原节点 `numKeys` 从 `3` 更新为 `1`。
 
-6. **返回分裂信息**：
+6. 返回分裂信息：
 
-   - **结构体字段**：
+   - 结构体字段：
 
      ```go
      return Split{
@@ -942,11 +1012,13 @@ func (node *LeafNode) split() (Split, error)
      }, nil
      ```
 
-   - **提升键逻辑**：新节点的第一个键作为父节点的新分隔键（B+树特性）。
+   - 提升键逻辑：新节点的第一个键作为父节点的新分隔键（B+树特性）。
 
-## 5. Cursor
+   - 页号信息：父节点需要这些信息来更新其子节点指针
 
-### 5.1 BTreeCursor结构体
+# 5. Cursor
+
+## 5.1 BTreeCursor结构体
 
 ```go
 type BTreeCursor struct {
