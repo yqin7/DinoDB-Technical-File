@@ -25,6 +25,7 @@ B+树是一种自平衡的树形数据结构，支持高效的插入、删除和
 - 插入（Insert）
 - 查找（Find）
 - 更新（Update）
+- 删除（Delete）
 - 范围查询（SelectRange）
 - 全量查询（Select）
 
@@ -96,7 +97,7 @@ go build -buildvcs=false -o dinodb_stress ./cmd/dinodb_stress
 # 完整测试
 go test './test/concurrency/...' -race -timeout 180s -v
 
-# 压力测试
+# 压力测试，并发线程数为8
 ./dinodb_stress -index=btree -workload=workloads/i-a-sm.txt -n=8 -verify
 ```
 
