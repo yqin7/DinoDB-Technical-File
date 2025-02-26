@@ -1,7 +1,5 @@
 # DinoDB-Technical-File
 
-# DinoDB
-
 DinoDB是一个简单而高效的数据库系统实现，主要关注数据库的核心组件和并发控制机制。
 
 ## 项目特点
@@ -116,7 +114,6 @@ go test './test/concurrency/...' -race -timeout 180s -v
 
 ## 未来展望
 
-- 实现更多查询优化器策略
 - 添加更多索引类型支持
 - 优化大规模数据处理性能
 - 增强分布式数据处理能力

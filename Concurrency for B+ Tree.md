@@ -137,11 +137,11 @@ go test './test/concurrency/...' -race -timeout 180s -v
 
 **1. 顺序插入10000条数据测试**
 
-![insert_i_a_test](./images./insert_i_a_test.png)
+![insert_i_a_test](./images/insert_i_a_test.png)
 
 **2. 乱序插入10000条数据测试**
 
-![insert_i_i_test](./images./insert_i_i_test.png)
+![insert_i_i_test](./images/insert_i_i_test.png)
 
 ##### d. 补充说明
 
