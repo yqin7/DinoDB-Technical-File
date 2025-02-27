@@ -137,7 +137,7 @@ lock: Grabs a write lock on a resource. usage: lock <table> <key>
 
 #### 创建表
 ```
-dinodb> create table test
+dinodb> create btree table test
 ```
 
 #### 只读操作
@@ -206,11 +206,14 @@ dinodb> transaction commit
 ### 测试
 
 ```bash
-# 完整测试
+# 完整测试（无代码不能测试）
 go test './test/concurrency/...' -race -timeout 180s -v
 
 # 压力测试，并发线程数为8
 ./dinodb_stress -index=btree -workload=workloads/i-a-sm.txt -n=8 -verify
+
+# 压力测试，如果上述命令报错，	建议使用绝对路径
+./dinodb_stress -index=btree -workload="C:\Users\huo00\OneDrive\Documents\DinoDB-Technical-File\workloads\i-i-md.txt" -n=8 -verify
 ```
 
 ## 📊 性能测试结果
@@ -225,9 +228,8 @@ go test './test/concurrency/...' -race -timeout 180s -v
 * **Join**：哈希连接算法实现
 
 ## 🔮 未来展望
-* 添加更多索引类型支持
+* 添加索引类型支持
 * 优化大规模数据处理性能
-* 增强分布式数据处理能力
 
 ## 📫 获取代码
-由于课程要求，源代码暂时不能公开。如果你对项目感兴趣，请发送邮件至 huo000311@outlook.com 索取代码。我们会在课程结束后考虑开源此项目。
+由于课程要求（不能对未来学弟学妹公开代码），源代码暂时不能公开。如果你对项目感兴趣，请发送邮件至 huo000311@outlook.com 索取代码。
