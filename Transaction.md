@@ -1,4 +1,79 @@
-# 1. 核心字段
+# Transaction
+
+# 1. 重要概念
+
+## 1.1 严格两阶段锁定（Strict 2PL）协议工作原理
+
+**1. 两个阶段**：
+
+- **增长阶段**：事务只能获取锁，不能释放任何锁
+
+- **缩减阶段**：事务只能释放锁，不能获取新锁
+
+**2. 严格特性**
+
+- 所有的锁都必须持有到事务结束（提交或中止）
+- 不同于基本2PL，严格2PL不允许在事务过程中提前释放任何锁
+
+**3. 锁类型**：
+
+- **读锁（共享锁）**：多个事务可同时持有同一资源的读锁
+- **写锁（排他锁）**：只能由一个事务独占，与其他任何锁都互斥
+
+**4. 锁操作**：
+
+- **获取锁**：事务尝试获取资源锁，如果资源已被锁定且不兼容，则等待
+- **检测死锁**：通过等待图识别潜在的死锁情况
+- **回滚**：检测到死锁时，选择当前事务回滚，释放其持有的所有锁
+
+## 1.2 Strict 2PL如何保证ACID特性
+
+**1. 原子性（Atomicity）**：
+
+- 事务要么完全提交，要么完全回滚
+- 当发生错误（如死锁）时，事务管理器执行回滚，释放所有锁
+
+**2. 一致性（Consistency）**：
+
+- 锁机制确保事务只能以一致的方式修改数据
+- 资源级别的锁保护确保数据从一个一致状态转换到另一个一致状态
+
+**3. 隔离性（Isolation）**：
+
+- 严格2PL提供可串行化隔离级别
+- 事务间的干扰被最小化，每个事务看到的是数据库的一致快照
+- 防止了脏读、不可重复读和幻读问题
+
+**4. 持久性（Durability）**：
+
+- 事务提交后，锁被释放，更改永久保存
+- 结合日志机制确保即使系统崩溃也能恢复到正确状态
+
+## 1.3 严格两阶段锁定协议 vs 普通两阶段锁定协议：关键区别
+
+**1. 主要区别**:
+
+- **普通2PL**: 锁可以在事务执行过程中释放，只要遵循"先获取后释放"的原则
+- **严格2PL**: 所有锁必须持有到事务结束(提交或中止)后才能释放
+
+**2. 普通2PL的级联回滚问题**: 当事务A释放了对资源X的锁，事务B获取了X的锁并修改了X，此时如果事务A提交失败需要回滚，会导致：
+
+1. A已修改的数据需要恢复
+2. B读取了A未提交(最终会回滚)的数据，产生了依赖
+3. B也必须回滚，即使B本身没有错误
+4. 如果C依赖B，C也需要回滚，形成级联效应
+
+**3. 严格2PL避免级联回滚的原理**: 严格2PL通过持有所有锁到事务结束，确保其他事务无法读取或修改未提交的数据，因此不会产生依赖关系，避免了级联回滚问题。
+
+**4. 严格2PL获取锁图示**
+
+![strict_2PL](/images/strict_2PL.png)
+
+**5. 普通2PL获取锁图示**
+
+![strict_2PL](/images/2PL.png)
+
+# 2. 核心字段
 
 ```go
 type TransactionManager struct {
@@ -9,7 +84,7 @@ type TransactionManager struct {
 }
 ```
 
-## 1.1 ResourceLockManager
+## 2.1 ResourceLockManager
 
 ```go
 type ResourceLockManager struct {
@@ -56,7 +131,7 @@ resourceLockManager = {
     2.3 释放 mtx 锁           // mtx 被释放
 ```
 
-## 1.2 WaitsForGraph
+## 2.2 WaitsForGraph
 
 ```go
 // 等待图，用于检测事务间的死锁
@@ -102,7 +177,7 @@ AddEdge(事务B, 事务A)    // 添加等待边：B -> A
                         // DetectCycle() 返回 true，表示检测到死锁
 ```
 
-## 1.3 transactions
+## 2.3 transactions
 
 ```go
 // 事务哈希表
@@ -155,14 +230,14 @@ Commit("client-uuid-1"):
     1.3 从transactions哈希表中删除事务
 ```
 
-## 1.4 sync.RWMutex
+## 2.4 sync.RWMutex
 
 - 功能：读写锁专门保护上面的 transactions map 的并发访问
 - 注意：**每个哈希表都有自己专门的锁来保护并发访问，这是 Go 中常见的并发安全设计模式。**之前的lockedResources哈希表、edges哈希表、locks哈希表都用这种模式控制并发
 
-# 2. 核心函数
+# 3. 核心函数
 
-## 2.1 Begin
+## 3.1 Begin
 
 ### A. 参数介绍
 
@@ -194,7 +269,7 @@ func (tm *TransactionManager) Begin(clientId uuid.UUID) error
 - 如果事务存在返回`"transaction already began"`
 - 如果创建成功返回nil
 
-## 2.2 Lock
+## 3.2 Lock
 
 ```go
 func (tm *TransactionManager) Lock(clientId uuid.UUID, table database.Index, resourceKey int64, lType LockType) error
@@ -284,7 +359,7 @@ waitsForGraph = {
 - 检测到死锁：`"deadlock detected"`
 - 获取资源锁失败：来自 `resourceLockManager.Lock()` 的错误
 
-## 2.3 Unlock
+## 3.3 Unlock
 
 ```go
 func (tm *TransactionManager) Unlock(clientId uuid.UUID, table database.Index, resourceKey int64, lType LockType)
@@ -343,7 +418,7 @@ func (tm *TransactionManager) Unlock(clientId uuid.UUID, table database.Index, r
 - 锁类型不匹配：`"incorrect unlock type"`
 - 释放资源锁失败：来自 `resourceLockManager.Unlock()` 的错误
 
-## 2.4 Commit
+## 3.4 Commit
 
 ```go
 func (tm *TransactionManager) Commit(clientId uuid.UUID)
@@ -385,7 +460,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 
 - 提交成功：返回 nil
 
-## 2.5 Rollback
+## 3.5 Rollback
 
 ### **A. 参数介绍**
 
@@ -420,9 +495,9 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 - 释放资源锁失败：来自 `resourceLockManager.Unlock()` 的错误
 - 回滚成功：返回 nil
 
-# 3. 测试
+# 4. 测试
 
-## 3.1 测试框架
+## 4.1 测试框架
 
 ```go
 测试代码                     handleTransactionThread
@@ -439,31 +514,31 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
    |-- sendWithDelay ------------->等待下一个命令
 ```
 
-## 3.2 基础功能测试
+## 4.2 基础功能测试
 
 - `testTransactionBasic`: 测试基本的写锁获取
 - `testTransactionWriteUnlock`: 测试写锁的加锁解锁
 - `testTransactionReadUnlock`: 测试读锁的加锁解锁
 - `testTransactionCommitsReleaseLocks`: 测试提交时释放所有锁
 
-## 3.3 锁类型和兼容性测试
+## 4.3 锁类型和兼容性测试
 
 - `testTransactionReadLockNoCycle`: 多个读锁共存测试
 - `testTransactionDontUpgradeLocks`: 禁止读锁升级为写锁
 - `testTransactionDontDowngradeLocks`: 锁降级场景测试
 - `testTransactionLockIdempotency`: 重复加锁的幂等性测试
 
-## 3.4 错误处理测试
+## 4.4 错误处理测试
 
 - `testTransactionWrongUnlockLockType`: 错误的解锁类型处理
 - `testTransactionDeadlock`: 死锁检测和处理
 
-## 3.5 并发场景测试
+## 4.5 并发场景测试
 
 - `testTransactionDAGNoCycle`: 有向无环图并发场景
 - `testTransactionDeadlock`: 死锁并发场景
 
-## 3.6 完整事务流程测试
+## 4.6 完整事务流程测试
 
 `TestCompleteTransaction`: 测试完整的事务生命周期
 
@@ -471,7 +546,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 - 场景2: 锁升级失败和回滚
 - 场景3: 新事务获取已回滚事务的资源
 
-## 3.7 压力测试
+## 4.7 压力测试
 
 `TestStress`: 高并发场景下的系统稳定性测试
 
@@ -487,7 +562,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
   - 错误恢复机制
   - 系统稳定性
 
-## 3.8 资源使用测试
+## 4.8 资源使用测试
 
 `TestResourceUsage`: 系统资源消耗监控测试
 
@@ -508,7 +583,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 
   - 内存使用随事务数量线性增长，没有泄漏
 
-## 3.9 REPL测试框架
+## 4.9 REPL测试框架
 
 **REPL 解析和调度流程**
 
@@ -639,9 +714,9 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
                       └───────────────────┘
 ```
 
-# 4. 存在的问题
+# 5. 存在的问题
 
-## 4.1 压力测试中的死锁问题
+## 5.1 压力测试中的死锁问题
 
 ### A. 问题表现
 

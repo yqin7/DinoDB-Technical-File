@@ -221,7 +221,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
    - 设置延迟释放：`defer index.pager.PutPage(rootPage)`
 
-   - 设置延迟解锁：`defer unsafeUnlockRoot(rootNode)`确保函数返回时解锁根节点
+   - 设置延迟解锁：`defer unsafeUnlockRoot(rootNode)`确保函数返回时解锁根节点，正常情况不会调用
 
    - 目的：确保函数结束时释放根页面，防止内存泄漏
 
@@ -302,12 +302,16 @@ func (index *BTreeIndex) Insert(key int64, value int64)
    - 更新numKeys
    - 最终树组装完成👇
 
-                  	      [key3]         (页面0)
-                                 	     /       \
-                                 	[key2]        [key4]    (其他页面)
-                                 	/    \       /      \
-            [key1]->[key2]->[key3]->[key4,key5]
-   
+                  	      ```
+                                          [key3]         (页面0)
+                                  	     /       \
+                                  	[key2]        [key4]    (其他页面)
+                            	/    \       /      \
+                          [key1]->[key2]->[key3]->[key4,key5]
+             ```
+            
+            
+
 6. 图示
 
 ![b_tree_insert](./images/b_tree_insert.jpg)
