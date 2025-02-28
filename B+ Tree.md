@@ -78,36 +78,59 @@ func (node *InternalNode) getKeyAt(index int64) int64 {
 ### 2.1.1 BTreeIndex 结构体
 
 ```go
-// Index 接口定义的方法
+// Index 接口定义数据库索引的标准操作方法
 type Index interface {
+    // Close 关闭索引并释放资源
     Close() error
+    // GetName 返回索引的名称
     GetName() string
+    // GetPager 返回索引使用的页面管理器
     GetPager() *pager.Pager
+    // Find 查找指定键的条目
     Find(int64) (entry.Entry, error)
+    // Insert 向索引中插入新的键值对
     Insert(int64, int64) error
+    // Update 更新索引中已存在键的值
     Update(int64, int64) error
+    // Delete 从索引中删除指定键的条目
     Delete(int64) error
+    // Select 返回索引中的所有条目
     Select() ([]entry.Entry, error)
+    // Print 打印整个索引结构
     Print(io.Writer)
+    // PrintPN 打印特定页号的节点内容
     PrintPN(int, io.Writer)
+    // CursorAtStart 返回指向索引第一个条目的游标
     CursorAtStart() (cursor.Cursor, error)
 }
 
-// BTreeIndex 实现了所有这些方法
+// BTreeIndex 实现了Index接口，使用B+树作为底层数据结构
 type BTreeIndex struct {
-    pager  *pager.Pager // The pager used to store the B+Tree's data.
-    rootPN int64        // The pagenum of this B+Tree's root node.
+    pager  *pager.Pager // 存储B+树数据的页面管理器
+    rootPN int64        // B+树根节点的页号
 }
+
+// Close 关闭索引并将所有更改刷新到磁盘
 func (index *BTreeIndex) Close() error { ... }
+// GetName 返回索引的文件名
 func (index *BTreeIndex) GetName() string { ... }
+// GetPager 返回索引的页面管理器
 func (index *BTreeIndex) GetPager() *pager.Pager { ... }
+// Find 在B+树中查找指定键的条目
 func (index *BTreeIndex) Find(key int64) (entry.Entry, error) { ... }
+// Insert 向B+树中插入新的键值对，处理可能的节点分裂
 func (index *BTreeIndex) Insert(key int64, value int64) error { ... }
+// Update 更新B+树中已存在键的值
 func (index *BTreeIndex) Update(key int64, value int64) error { ... }
+// Delete 从B+树中删除指定键的条目
 func (index *BTreeIndex) Delete(key int64) error { ... }
+// Select 返回B+树中的所有条目，按键排序
 func (index *BTreeIndex) Select() ([]entry.Entry, error) { ... }
+// Print 格式化打印整个B+树结构
 func (index *BTreeIndex) Print(w io.Writer) { ... }
+// PrintPN 格式化打印指定页号的节点内容
 func (index *BTreeIndex) PrintPN(pagenum int, w io.Writer) { ... }
+// CursorAtStart 返回指向B+树最左侧叶子节点第一个条目的游标
 func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error) { ... }
 ```
 
@@ -121,7 +144,7 @@ func (index *BTreeIndex) CursorAtStart() (cursor.Cursor, error) { ... }
 
 ### 2.1.2 Split 结构体
 
-```
+```go
 type Split struct {
     isSplit bool  // 标志是否发生了分裂
     key     int64 // 需要上推到父节点的中间键
@@ -135,13 +158,21 @@ type Split struct {
 ### 2.1.2 Node接口
 
 ```go
+// Node 定义了叶子节点和内部节点共享的通用接口
 type Node interface {
+    // insert 在B+树中插入或更新键值对，可能触发节点分裂
     insert(key int64, value int64, update bool) (Split, error)
+    // delete 从B+树中删除指定键的条目
     delete(key int64)
+    // get 查找并返回指定键的值和存在状态
     get(key int64) (value int64, found bool)
+    // search 在节点中二分查找指定键的位置索引
     search(searchKey int64) int64
+    // printNode 格式化输出节点内容到指定输出流
     printNode(io.Writer, string, string)
+    // getPage 返回节点对应的底层页面
     getPage() *pager.Page
+    // getNodeType 返回节点类型（内部节点或叶子节点）
     getNodeType() NodeType
 }
 ```
@@ -182,11 +213,15 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 
    - 获取根页面：`rootPage, err := index.pager.GetPage(index.rootPN)`
 
-   - 锁定根节点：`lockRoot(rootPage)`
+   - 锁定根页面：`lockRoot(rootPage)`
 
-   - 转换为节点：`rootNode := pageToNode(rootPage)`
+   - 转换根页面转换为节点：`rootNode := pageToNode(rootPage)`
+
+   - 初始化根节点：`initRootNode(rootNode)`设置父节点指针
 
    - 设置延迟释放：`defer index.pager.PutPage(rootPage)`
+
+   - 设置延迟解锁：`defer unsafeUnlockRoot(rootNode)`确保函数返回时解锁根节点
 
    - 目的：确保函数结束时释放根页面，防止内存泄漏
 
@@ -229,35 +264,35 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 4. 内部节点分裂（见图示）
 
    - 调用链：`InternalNode.split()`
-
-
-   - 分裂过程：
-
-     a. 计算分裂点
-
-     - `midpoint = (3-1)/2 = 1`，即 key3 的位置
-
-     b. 创建新节点并转移数据，新的节点
-
-     ```
-         [key4]
-        /      \
-     [key3]->[key4 key5]
-     ```
-
-     c. 原节点数据处理
-
-     - 执行 `node.updateNumKeys(midpoint)`，设置键数量为1
-     - 数据特点：
-       - 页中实际数据仍然是 `[key2,key3,key4]`
-       - 因为 numKeys=1，只能访问到 key2
-       - key3, key4 和其指向的节点虽然物理存在，但逻辑上不可访问
-       - 这些"不可见"数据区域会在将来被新数据覆盖
-     
-     d. 分裂结果：
-     
-     - `Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}`，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
-
+   
+   
+      - 分裂过程：
+   
+        a. 计算分裂点
+   
+        - `midpoint = (3-1)/2 = 1`，即 key3 的位置
+   
+        b. 创建新节点并转移数据，新的节点
+   
+        ```
+            [key4]
+           /      \
+        [key3]->[key4 key5]
+        ```
+   
+        c. 原节点数据处理
+   
+        - 执行 `node.updateNumKeys(midpoint)`，设置键数量为1
+        - 数据特点：
+          - 页中实际数据仍然是 `[key2,key3,key4]`
+          - 因为 numKeys=1，只能访问到 key2
+          - key3, key4 和其指向的节点虽然物理存在，但逻辑上不可访问
+          - 这些"不可见"数据区域会在将来被新数据覆盖
+        
+        d. 分裂结果：
+        
+        - `Split{key:key3, leftPN: 原节点page, rightPN: 新节点的page}`，这里返回的Split信息是新的上层节点的key和指针（子节点页号）
+   
 5. 组装新的根节点
 
    - 因为是根节点分裂，需要创建新的根节点
@@ -267,12 +302,12 @@ func (index *BTreeIndex) Insert(key int64, value int64)
    - 更新numKeys
    - 最终树组装完成👇
 
-                  [key3]         (页面0)
-                  /     \
-              [key2]   [key4]    (其他页面)
-              /    \    /    \
-        [key1]->[key2]->[key3]->[key4,key5]
-
+                  	      [key3]         (页面0)
+                                 	     /       \
+                                 	[key2]        [key4]    (其他页面)
+                                 	/    \       /      \
+            [key1]->[key2]->[key3]->[key4,key5]
+   
 6. 图示
 
 ![b_tree_insert](./images/b_tree_insert.jpg)
@@ -441,11 +476,7 @@ func (index *BTreeIndex) Find(key int64) (entry.Entry, error)
 
 #### **C. 完整流程** 
 
-1. 获取和锁定根节点
-   - `index.pager.GetPage(index.rootPN)` 获取根页面`rootPage`(永远在页面0)，将根页面`rootPage`转换为根节点`rootNode`
-   - 锁定根节点：`lockRoot(rootPage)`
-   - 转换为节点：`rootNode := pageToNode(rootPage)`
-   - 设置延迟释放：`defer index.pager.PutPage(rootPage)`
+1. 获取和锁定根页面并转换为根节点，设置延时释放根节点的锁和页面释放
 
 
 2. 从根节点开始查找
@@ -514,7 +545,7 @@ func (index *BTreeIndex) Update(key int64, value int64) error
 
 #### C. 完整流程
 
-1. 获取和锁定根节点，设置延迟释放，和`insert(),find()`一样
+1. 获取和锁定根页面并转换为根节点，设置延时释放根节点的锁和页面释放
 
 2. 直接调用`Node.insert(key, value, update=true)`
 
@@ -529,6 +560,60 @@ func (index *BTreeIndex) Update(key int64, value int64) error
 
    - 键不存在：返回错误 "cannot update non-existent entry"
 
+### 2.2.6 delete
+
+#### **A. 参数介绍**
+
+- 参数：
+  - key - 要删除的键
+- 返回：
+  - error - 如果删除过程中出现页面获取失败等错误则返回错误信息，删除成功或键不存在则返回nil
+- 目的：从B+树中删除指定键的条目
+
+#### **B. 删除过程的调用链**
+
+1. `BTreeIndex.Delete(key)`
+
+2. -> `Node.delete(key)` （接口多态，实际执行内部节点或叶子节点的 `delete` 方法）
+
+3. -> 递归调用直到叶子节点
+
+#### C. 完整流程
+
+1. 获取和锁定根页面并转换为根节点，设置延时释放根节点的锁和页面释放
+2. 开始递归删除过程：
+
+   - 调用`rootNode.delete(key)`从根节点开始删除操作
+
+   - 由于接口多态，根据节点类型执行对应的`delete`方法
+3. 内部节点的删除处理：
+
+   - 解锁所有父节点（并发优化）
+
+   - 使用二分查找确定目标键所在的子节点路径
+
+   - 锁定子节点并递归调用子节点的`delete`方法
+
+   - 通过`getAndLockChildAt(childIdx)`获取并锁定子节点
+4. 叶子节点的删除处理：
+
+   - 使用二分查找找到目标键的位置
+
+   - 如果键不存在，直接返回（无需任何操作）
+
+   - 如果键存在，将后续所有条目左移一位，覆盖要删除的条目
+
+   - 更新节点的条目数量（`numKeys-1`）
+5. 返回结果：
+
+   - 操作成功完成返回nil
+- 如果获取页面失败，返回相应错误
+
+#### **D. 实现限制和潜在问题**
+
+1. 无节点合并机制：删除操作不会触发节点合并，可能导致树中存在多个低利用率或空节点。
+2. 游标遍历复杂化：游标遍历可能存在的空叶子节点，`Next()`包含额外检查，确保在移动到空节点时跳过它们。
+3. 并发控制考量：添加节点合并可能会增加并发锁定的复杂性和死锁风险。
 
 # 3. InternalNode
 
@@ -573,15 +658,16 @@ func (index *BTreeIndex) Update(key int64, value int64) error
 ## 3.2 内部节点最多key数量公式
 
 - 步骤1: 计算可用空间
-  ptrSpace = pager.Pagesize - INTERNAL_NODE_HEADER_SIZE - KEY_SIZE
-          = 4096 - 11 - 10
-          = 4075
-
+  
+  - ptrSpace = pager.Pagesize - INTERNAL_NODE_HEADER_SIZE - KEY_SIZE
+            = 4096 - 11 - 10
+            = 4075
+  
 - 步骤2: 计算键数量
 
-​	PN_SIZE：每个指针大小
+  - PN_SIZE：每个指针大小
 
-​	**KEYS_PER_INTERNAL_NODE = (ptrSpace / (KEY_SIZE + PN_SIZE)) - 1 = (4075 / (10 + 10)) - 1 = 202个，实际代码中第202个键会分裂，最多存储201个键**
+  - **KEYS_PER_INTERNAL_NODE = (ptrSpace / (KEY_SIZE + PN_SIZE)) - 1 = (4075 / (10 + 10)) - 1 = 202个，实际代码中第202个键会分裂，最多存储201个键**
 
 ## 3.3 InternalNode Function
 
@@ -902,7 +988,7 @@ func (node *LeafNode) insert(key int64, value int64, update bool) (Split, error)
 
 1. 查找插入位置：
 
-   - 使用二分查找确定新键值对的插入位置 `insertPos`。
+   - 使用`node.search`二分查找确定新键值对的插入位置 `insertPos`。
    - 示例：现有键值对 `[10, 20, 30]`，插入 `25` → `insertPos = 2`。
 
 2. 检查键是否存在：
