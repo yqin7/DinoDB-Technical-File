@@ -627,7 +627,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
                 |                                |
                 | 成功                            |
                 v                                |
-[db_repl.go - HandleFind函数内]                   |
+[transaction_repl.go - HandleFind函数内]          |
 +---------------+---------------+                |
 | 调用数据库操作                  |                |
 | database.HandleFind(db,payload)|               |
@@ -635,7 +635,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
                 |                                |
                 | 成功                            |
                 v                                |
-[btree.go - BTreeIndex.Find]                     |
+[de_repl.go - transaction_repl.go函数内]          |
 +---------------+---------------+     +----------+----------+
 | 执行B+树查找                    |     | 操作失败            |
 | table.Find(key)               +---->| 执行事务回滚         | [transaction_repl.go - HandleFind函数内]

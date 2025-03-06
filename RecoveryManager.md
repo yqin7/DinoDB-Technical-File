@@ -9,19 +9,18 @@
 ### Phase #1 – 分析阶段 (Analysis)
 
 - 从最近的检查点checkpoint（类似于ARIES中的MasterRecord）开始，向前扫描日志
-- 识别崩溃时处于活跃状态的事务
-- 确定哪些表需要恢复，哪些事务需要撤销
+- **从表开头识别崩溃时处于活跃状态的事务**
+- 确定哪些表需要恢复，未提交活跃事务之后需要撤销
 - 构建事务状态表，追踪每个事务的操作记录
 
 ### Phase #2 – 重做阶段 (Redo)
 
-- 在当前实现中，仅对已提交的事务执行重做，而不是所有操作
+- **对所有事务不论是否提交都执行重做**
 - 确保所有持久化的操作都被正确应用到数据库状态
 
 ### Phase #3 – 撤销阶段 (Undo)
 
-- **逆序撤销所有未提交事务的操作直到崩溃时活跃事务的最早日志记录**
-- 为每个撤销操作写入相应的日志记录
+- **逆序撤销所有未提交事务的所有操作，直到崩溃时活跃事务的最早日志操作记录**
 - 最后标记所有未提交事务为已回滚
 
 ## 1.2 ARIES恢复图示解释
@@ -64,6 +63,23 @@ func HandleInsert(db *database.Database, tm *concurrency.TransactionManager, rm 
 ```
 
 ## 1.4 日志文件结构
+
+```go
+type editLog struct {
+    id        uuid.UUID // The id of the transaction this edit was done in
+    tablename string    // The name of the table where the edit took place
+    action    action    // The type of edit action taken
+    key       int64     // The key of the tuple that was edited
+    oldval    int64     // The old value before the edit
+    newval    int64     // The new value after the edit
+}
+startLog{
+		id: clientId, // 在start函数构造 
+}
+commitLog{
+		id: clientId, // 在Commit函数构造
+}
+```
 
 - 所有类型的日志（表创建、编辑、事务开始/提交、检查点）都按时间顺序写入**同一个日志文件, 所有表的所有日志都写入同一个表**
 
@@ -317,7 +333,7 @@ func (rm *RecoveryManager) Start(clientId uuid.UUID) error
 - 如果操作成功，返回 nil
 - 如果有错误发生，返回带上下文信息的错误
 
-### C. 记录实例
+### C. 创建实例
 
 - 执行`rm.Start(uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"))`，启动一个新事务，日志文件会记录
 
@@ -374,7 +390,7 @@ func (rm *RecoveryManager) Edit(clientId uuid.UUID, table database.Index, action
 - 如果操作成功，返回 nil
 - 如有错误发生，返回带上下文信息的错误
 
-### C. 记录实例
+### C. 编辑实例
 
 - 执行插入操作：`rm.Edit(tx1, studentsTable, INSERT_ACTION, 10, 0, 100)`，日志文件会记录
 
@@ -441,7 +457,7 @@ func (rm *RecoveryManager) Commit(clientId uuid.UUID) error
 - 如果操作成功，返回 nil
 - 如果有错误发生，返回带上下文信息的错误
 
-### C. 记录实例
+### C. 提交实例
 
 - 执行`rm.Commit(uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"))`，提交一个事务，日志文件会记录
 
@@ -450,6 +466,10 @@ func (rm *RecoveryManager) Commit(clientId uuid.UUID) error
   ```
 
 ## 3.5 Checkpoint
+
+```go
+func (rm *RecoveryManager) Checkpoint() error
+```
 
 ### A. 参数介绍
 
@@ -516,4 +536,296 @@ func (rm *RecoveryManager) Commit(clientId uuid.UUID) error
   < checkpoint >
   ```
 
-  
+
+## 3.6 Redo
+
+```go
+func (rm *RecoveryManager) redo(log log) error
+```
+
+### A. 参数介绍
+
+- 参数：
+  - `log log`：要重做的日志条目，可以是tableLog或editLog类型
+- 返回：
+  - `error`：如果重做操作失败，返回错误；否则返回 nil
+- 目的：
+  - 在恢复过程中重新执行日志中记录的操作，但不生成新的日志记录
+  - 用于将数据库状态恢复到崩溃前的一致状态
+- 说明：
+  - 专用于恢复过程，重做操作不会再次写入日志文件
+  - 包含特殊的错误处理逻辑，处理可能由于系统状态不一致导致的操作失败
+
+### B. 完整流程
+
+**1. 使用`switch`类型断言处理不同类型的日志**
+
+- 对于表创建日志(tableLog)
+  - 构造表创建命令字符串
+    - `payload := fmt.Sprintf("create %s table %s", log.tblType, log.tblName)`
+  - 调用数据库处理函数执行表创建
+  - 若失败则返回错误
+- 对于编辑日志(editLog)，根据操作类型执行：
+  - 插入操作(INSERT_ACTION)
+    - 构造插入命令字符串
+      - `payload := fmt.Sprintf("insert %v %v into %s", log.key, log.newval, log.tablename)`
+    - 尝试执行插入操作
+      - 若插入失败（可能是键已存在），则尝试更新操作
+      - 若更新也失败，返回错误
+  - 更新操作(UPDATE_ACTION)
+    - 构造更新命令字符串
+      - `payload := fmt.Sprintf("update %s %v %v", log.tablename, log.key, log.newval)`
+    - 尝试执行更新操作
+      - 若更新失败（可能是键不存在），则尝试插入操作
+      - 若插入也失败，返回错误
+  - 删除操作(DELETE_ACTION)
+    - 构造删除命令字符串
+      - `payload := fmt.Sprintf("delete %v from %s", log.key, log.tablename)`
+    - 执行删除操作
+    - 若删除失败，返回错误
+- 对于不支持的日志类型
+  - 返回错误，说明只能重做表创建或编辑日志
+
+**2. 返回结果**
+
+- 如果所有操作成功执行，返回 nil
+- 如果有错误发生，返回相应错误
+
+### C. 恢复实例
+
+- 当重做表创建日志时：
+
+  ```
+  < create btree table students >
+  ```
+
+  1. 执行`create btree table students`
+  2. 如果表已存在，返回错误，恢复过程会忽略此错误继续执行
+
+- 当重做插入操作时：
+
+  ```
+  < 123e4567-e89b-12d3-a456-426614174000, students, INSERT, 10, 0, 100 >
+  ```
+
+  1. 尝试执行`insert 10 100 into students`
+  2. 如果该键已存在，则尝试执行`update students 10 100`
+
+- 当重做更新操作时：
+
+  ```
+  < 123e4567-e89b-12d3-a456-426614174000, students, UPDATE, 10, 100, 200 >
+  ```
+
+  1. 尝试执行`update students 10 200`
+  2. 如果记录不存在，则尝试执行`insert 10 200 into students`
+
+- 当重做删除操作时：
+
+  ```
+  < 123e4567-e89b-12d3-a456-426614174000, students, DELETE, 10, 100, 0 >
+  ```
+
+  1. 执行`delete 10 from students`
+  2. 如果记录不存在，返回错误，恢复过程会处理此错误
+
+## 3.7 Undo
+
+```go
+func (rm *RecoveryManager) undo(log editLog) error
+```
+
+### A. 参数介绍
+
+- 参数：
+  - `log editLog`：需要撤销的编辑日志记录
+
+- **返回：**
+  - `error`：如果撤销操作失败，返回相应错误；操作成功则返回 `nil`。
+
+- **目的：**
+  - 执行与编辑日志中记录的操作相反的操作，以撤销之前对数据库的修改，从而帮助数据库回滚到一致状态。
+
+- **说明：**
+
+  - 撤销操作专用于恢复和事务回滚过程中。
+
+  - 根据操作类型，构造相应的撤销命令（如删除、更新或插入），并调用对应的处理函数来完成操作。
+
+### B. 完整流程
+
+**1. 使用`switch`类型断言处理不同类型的日志**
+
+- **对于插入操作 (`INSERT_ACTION`):**
+
+  - 原操作为插入记录，撤销时需要删除该记录。
+
+  - 构造命令字符串：
+    `payload := fmt.Sprintf("delete %v from %s", log.key, log.tablename)`
+
+  - 调用函数：`HandleDelete(rm.db, rm.tm, rm, payload, log.id)`
+
+- **对于更新操作 (`UPDATE_ACTION`):**
+
+  - 原操作为更新记录，撤销时需要将记录的值恢复为修改前的旧值。
+
+  - 构造命令字符串：
+    `payload := fmt.Sprintf("update %s %v %v", log.tablename, log.key, log.oldval)`
+
+  - 调用函数：`HandleUpdate(rm.db, rm.tm, rm, payload, log.id)`
+
+- **对于删除操作 (`DELETE_ACTION`):**
+
+  - 原操作为删除记录，撤销时需要重新插入该记录，并恢复其旧值。
+
+  - 构造命令字符串：
+    `payload := fmt.Sprintf("insert %v %v into %s", log.key, log.oldval, log.tablename)`
+
+  - 调用函数：`HandleInsert(rm.db, rm.tm, rm, payload, log.id)`
+
+**2. 错误处理**
+
+- 对于每种操作，如果对应的处理函数返回错误，则立即返回该错误。
+- 若所有撤销操作均成功执行，则返回 `nil`。
+
+### C. 撤销实例
+
+- **撤销插入操作：**
+
+  （以下log为日志记录，而非实际函数调用）
+
+  ```
+  < 123e4567-e89b-12d3-a456-426614174000, students, INSERT, 10, 0, 100 >
+  ```
+
+  1. 撤销操作构造命令：`delete 10 from students`。
+  2. 调用 `HandleDelete` 删除记录，从而撤销之前的插入操作。
+
+- **撤销更新操作：**
+
+  ```
+  < 123e4567-e89b-12d3-a456-426614174000, students, UPDATE, 10, 100, 200 >
+  ```
+
+  1. 撤销操作构造命令：`update students 10 100`。
+  2. 调用 `HandleUpdate` 将记录恢复到更新前的旧值。
+
+- **撤销删除操作：**
+
+  ```
+  < 123e4567-e89b-12d3-a456-426614174000, students, DELETE, 10, 100, 0 >
+  ```
+
+  1. 撤销操作构造命令：`insert 10 100 into students`。
+  2. 调用 `HandleInsert` 重新插入记录，从而撤销删除操作。
+
+## 3.8 Recover
+
+```go
+func (rm *RecoveryManager) Recover() error
+```
+
+### A. 参数介绍
+
+- 参数：
+  - 无。
+- 返回：
+  - `error`：如果恢复过程中发生错误，则返回错误；否则返回 `nil`。
+- 目的：
+  - 在数据库启动时，通过读取预写日志（WAL），将数据库状态恢复到崩溃前的一致状态。
+  - 包括重做已提交事务的操作和撤销未提交事务的操作，确保数据一致性。
+
+### B. 完整流程
+
+**1. 获取互斥锁**
+
+- 调用 `rm.mtx.Lock()` 确保恢复过程的线程安全，结束时通过 `defer rm.mtx.Unlock()` 释放锁。
+
+**2. 读取日志和检查点**
+
+- 调用内部函数 `rm.readLogs()` 读取所有日志记录和最近检查点的位置。
+- 如果读取日志出错，立即返回错误。
+
+**3. 初始化事务状态追踪**
+
+- `activeTransactions`：
+  - 定义为 `map[uuid.UUID]bool`哈希表，用于标记所有在恢复过程中处于活跃状态的事务。
+  - 在遍历日志时，对于每个 `startLog`，将对应事务的 ID 标记为活跃；遇到 `commitLog` 则从该映射中删除对应事务。
+
+- `transactionLogs`：
+
+  - 定义为 `map[uuid.UUID][]editLog`哈希表，用于按事务 ID 分类保存所有编辑日志，和事务是否活跃无关。
+
+  - 遍历日志过程中，将每个 `editLog` 按事务 ID 存入该映射，以便后续在重做或撤销阶段处理该事务的所有操作。
+
+**4. 第一阶段：分析 - 确定活跃事务和重建表结构**
+
+- **目的**：通过扫描日志确定崩溃时哪些事务处于活跃状态，建立事务日志记录哈希表，并重建表结构。
+- 遍历日志记录（检查点前和检查点后）：
+  - **startLog**：标记事务为活跃；如果是检查点后遇到的startLog，还会清除该事务先前的编辑日志（表示事务重新开始）。
+  - **commitLog**：移除相应事务的活跃标记。
+  - **tableLog**：调用 `rm.redo(l)` 重做表创建操作；若返回错误且不包含"already exists"，则返回错误。
+  - **editLog**：将编辑日志记录追加到 `transactionLogs` 中，按事务 ID 分类存储。
+
+**5. 第二阶段：重做 - 重做检查点之后的编辑操作**
+
+- **目的**：重放检查点后的所有操作，将数据库物理状态恢复到崩溃前的状态，无论事务是否提交。
+
+- 重做检查点后的编辑日志：
+  - 检查点保证了之前所有的数据变更已被刷新到磁盘，故检查点前的编辑操作无需重做。
+  - 对每个检查点后的编辑日志调用 `rm.redo(editLog)`，执行相应操作。
+  - 忽略特定类型的预期错误（如"already exists"或"doesn't exist"）。
+
+**6. 第三阶段：撤销 - 回滚所有活跃（未提交）事务**
+
+- **目的**：回滚所有未提交事务的操作，确保数据库的逻辑一致性，只保留已提交事务的效果。
+- 遍历`activeTransactions`中的所有事务ID：
+  - 获取该事务在 `transactionLogs` 中所有记录的编辑操作。
+  - 按照逆序（从最新到最旧）遍历并撤销每个操作：
+    - **INSERT_ACTION**：执行删除操作，撤销插入。
+    - **UPDATE_ACTION**：尝试更新回原值；若失败，尝试插入原值。
+    - **DELETE_ACTION**：重新插入被删除的记录。
+  - 对每个撤销的事务，写入一条 `commitLog` 日志，标记该事务已被回滚。
+
+**7. 清理和同步**
+
+- 重置 `rm.txStack` 为空映射，清除所有事务状态。
+- 调用 `rm.logFile.Sync()` 确保所有新写入的日志被刷新到磁盘。
+
+**8. 返回结果**
+
+- 如果恢复过程成功完成，返回 `nil`。
+- 如果任何阶段发生错误，返回相应的错误信息。
+
+### C. 恢复示例
+
+- 当数据库在事务 T1 提交后、事务 T2 未提交时崩溃：
+  1. **分析阶段**：发现 T1 已提交，T2 活跃。
+  2. **重做阶段**：重做检查点后的所有操作，包括 T1 和 T2 的操作。
+  3. **撤销阶段**：逆序撤销 T2 的所有操作，包括检查点之前的，保留 T1 的操作。
+  4. 结果：数据库状态恢复为只包含 T1 提交的更改。
+
+### D. 设计考量
+
+**1. 为什么不直接复用txStack而是从日志重建**
+
+- **日志是唯一可靠来源**：WAL系统设计中，日志是唯一被保证持久化的完整操作记录。在实际崩溃时，内存中的所有数据结构（包括`txStack`）都会丢失。恢复代码必须模拟这种真实情况，仅依赖持久化存储上的信息。
+- **符合ARIES协议**：标准ARIES协议明确规定恢复过程必须从日志重建状态，不能依赖崩溃前的易失性存储。
+
+**2. 为什么分析阶段从日志开头而非检查点开始**
+
+- **处理跨检查点的长事务**：事务可能在检查点前开始，但在崩溃时仍未提交。必须从事务开始点记录所有操作，以便正确撤销该事务的全部效果，维护原子性（要求事务要么完全提交，要么完全不提交）。
+
+  - 举例：
+
+    - 事务T1在检查点前开始插入记录A
+    - 检查点发生（记录T1为活跃事务）
+
+    - 系统崩溃
+
+  - 如果只考虑检查点后的操作，我们将无法撤销记录A的插入，导致数据库状态不一致。
+
+- **ARIES协议标准**：ARIES要求定位所有活跃事务的最早日志记录（可能在检查点之前很远），以确保完整的撤销操作序列。
+
+
+
