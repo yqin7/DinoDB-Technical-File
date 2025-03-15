@@ -1,8 +1,8 @@
 # Join
 
-## 1. 重要概念
+# 1. 重要概念
 
-### 1.1 基本哈希连接
+## 1.1 基本哈希连接
 
 **1. 构建阶段**：
 
@@ -24,7 +24,7 @@
 
 ![basic_join](./images/basic_join.png)
 
-### 1.2 分区哈希连接
+## 1.2 分区哈希连接
 
 **1. 分区构建阶段**：
 
@@ -45,11 +45,11 @@
 
 
 
-## 2. Hash Join Function
+# 2. Hash Join Function
 
-### 2.1 Join
+## 2.1 Join
 
-#### A. 参数介绍
+### A. 参数介绍
 
 ```go
 func Join(
@@ -78,7 +78,7 @@ func Join(
 * err - 错误信息
 ```
 
-#### B. 执行流程
+### B. 执行流程
 
 以下数据为例子，本例 joinOnLeftKey 和 joinOnRightKey都为True
 
@@ -105,7 +105,7 @@ func Join(
 预期匹配: 左表(6,600) 匹配 右表(6,600)
 ```
 
-##### 1. 创建左表和右表的哈希索引
+**1. 创建左表和右表的哈希索引**
 
 - 根据 joinOnLeftKey和 joinOnRightKey 分别创造是key还是value作为连接键的哈希索引。如果为True的话哈希索引的连接键为Key，反之为Value。
 
@@ -134,14 +134,14 @@ func Join(
 |                           |                           | └── [0] {Key: 11, Value: 1100} | ├── [0] {Key: 5, Value: 500} |
 |                           |                           |                                | └── [1] {Key: 6, Value: 600} |
 
-##### 2. 确保左右哈希索引相同全局深度
+**2. 确保左右哈希索引相同全局深度**
 
 - 全局深度决定了哈希索引目录的大小(2^全局深度)，表示哈希索引目录的大小，有多少个buckets，可以通过哈希值的多少位来定位bucket。比如全局深度 = 2时，buckets的数量为2 ^ 2 = 4
 - 左右两哈希索引扩展相同全局深度的目的是在探测(probe)阶段，每个bucket都有另一边相匹配的bucket对应。
 
 - 注意：目录大小是2^全局深度，但实际的物理bucket数量可能更少，因为多个目录项可能指向同一个物理bucket。比如当一个bucket的LocalDepth小于GlobalDepth时，就会出现多个目录项指向同一个bucket的。
 
-##### 3. 探测阶段
+**3. 探测阶段**
 
 - 获得左右所有的buckets页号，存储形式是通过目录数组，存储bucket的页号
 - 创建seen用来跳过重复配对的bucket pair，比如（以下例子非本例）
@@ -179,9 +179,9 @@ EntryPair{
 }
 ```
 
-### 2.2 buildHashIndex
+## 2.2 buildHashIndex
 
-#### A. 参数介绍
+### A. 参数介绍
 
 ```go
 func buildHashIndex(
@@ -199,7 +199,7 @@ func buildHashIndex(
 * err - 错误信息
 ```
 
-#### B. 执行流程
+### B. 执行流程
 
 **1. 初始化临时存储**：
 
@@ -242,9 +242,9 @@ func buildHashIndex(
 - 返回构建好的临时哈希索引tempIndex
 - 返回临时数据库文件名dbName，供后续清理使用
 
-### 2.3 probeBuckets
+## 2.3 probeBuckets
 
-#### A. 参数介绍
+### A. 参数介绍
 
 ```go
 func probeBuckets(
@@ -270,7 +270,7 @@ func probeBuckets(
 * error - 错误信息
 ```
 
-#### **B. 执行流程**
+### **B. 执行流程**
 
 **1. 大表构建阶段**
 
@@ -285,11 +285,11 @@ func probeBuckets(
   - 如果查询到匹配的键值对，根据joinOnLeftKey和joinOnRightKey的布尔值是否调换Key和Value的位置，把两对匹配的键值对加入结果集。
   - 如果没有查询到匹配的键值对，说明布隆过滤器误报，则跳过继续处理下一个小表的键值对。
 
-## 3. BloomFilter Function
+# 3. BloomFilter Function
 
 ![bloom_filter](./images/bloom_filter.png)
 
-#### A. 参数介绍
+### A. 参数介绍
 
 ```go
 func CreateFilter(size int64) (bf *BloomFilter)
@@ -339,7 +339,7 @@ h2 = MurmurHash(5) % 1024 = 456
 - 任一为0：返回false（一定不存在）
 ```
 
-#### B. 执行流程
+### B. 执行流程
 
 **1. 创建布隆过滤器**
 
@@ -356,7 +356,7 @@ h2 = MurmurHash(5) % 1024 = 456
   - 但凡有一个位置不是1，则数据库中一定不存在相同的key
   - 布隆过滤器可能会误报存在key（即不存在的key），但一定不会漏报存在的key
 
-#### **C. 性能分析**
+### **C. 性能分析**
 
 - 布隆过滤器检查只需要访问两个bit位
 
@@ -364,15 +364,15 @@ h2 = MurmurHash(5) % 1024 = 456
 
 - 当大量记录不匹配时，布隆过滤器可以快速过滤掉这些记录
 
-## 4. 测试方法
+# 4. 测试方法
 
-### A. 正确性测试
+## 4.1 正确性测试
 
 - 如上述例子，使用小数据集验证功能正确
 - key-key, key-value, value-key连接正确
 - 验证结果数量、结果值符合预期
 
-### B. 性能测试
+## 4. 性能测试
 
 **a. 左表1000条数据，右表100条数据，不同疏密程度10次运行耗时**
 
