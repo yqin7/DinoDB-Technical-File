@@ -1,8 +1,8 @@
 # Pager
 
-## 重要问题
+## 1. 重要概念
 
-### LRU体现
+### 1.1 LRU体现
 
 1. 新访问的页面放入 pinnedList 尾部（最近使用）
 
@@ -12,9 +12,9 @@
    
 2. 注意：freeList不会补充，它只作为初始的空闲页面池使用。freeList用完为空之后，如果获取新页面从unpinnedList刷盘后获取。
 
-## 重要参数
+## 2. 重要参数
 
-### freeList
+### 2.1 freeList
 
 ```go
 freeList     *list.List // List是链表，每个节点是L
@@ -22,7 +22,7 @@ freeList     *list.List // List是链表，每个节点是L
 
 预分配但未使用的页面列表，这些页面是已经分配了内存但还没被使用过的
 
-### unpinnedList 
+### 2.2 unpinnedList 
 
 ```go
 unpinnedList *list.List
@@ -30,7 +30,7 @@ unpinnedList *list.List
 
 未固定的页面列表，这些页面已在内存中但当前没有被使用，可以被淘汰
 
-### pinnedList      
+### 2.3 pinnedList      
 
 ```go
 pinnedList   *list.List
@@ -38,7 +38,7 @@ pinnedList   *list.List
 
 固定的页面列表，这些页面当前正在被数据库使用中的页面
 
-### pageTable
+### 2.4 pageTable
 
 ```go
 pageTable map[int64]*list.Link
@@ -51,7 +51,7 @@ pageTable 是一个哈希表（map）数据结构
 - key: int64 类型，表示页面号(pagenum)
 - value: *list.Link 类型，指向链表节点的指针，每个链表节点的value就是一个页
 
-## 完整参数
+## 3. 完整参数
 
 ```go
 type Pager struct {
@@ -78,9 +78,9 @@ type Page struct {
 }
 ```
 
-## Function
+## 4. Function
 
-### NewPage
+### 4.1 NewPage
 
 ```go
 func (pager *Pager) newPage(pagenum int64) (newPage *Page, err error) 
@@ -98,7 +98,7 @@ func (pager *Pager) newPage(pagenum int64) (newPage *Page, err error)
   - 重置脏页标记
   - 将引用计数设为1
 
-### **GetNewPage**
+### 4.2 **GetNewPage**
 
 ```go
 func (pager *Pager) GetNewPage() (page *Page, err error)
@@ -115,7 +115,7 @@ func (pager *Pager) GetNewPage() (page *Page, err error)
 5. 更新pageTable，建立页面号到页的映射关系
 6. 增加总页面数计
 
-### GetPage
+### 4.3 GetPage
 
 ```go
 func (pager *Pager) GetPage(pagenum int64) (page *Page, err error)
@@ -137,7 +137,7 @@ func (pager *Pager) GetPage(pagenum int64) (page *Page, err error)
 - 读取成功则加入 pinnedList 尾部并更新 pageTable
 - 返回加载的页面
 
-### PutPage
+### 4.4 PutPage
 
 ```go
 func (pager *Pager) PutPage(page *Page) (err error)
@@ -154,7 +154,7 @@ func (pager *Pager) PutPage(page *Page) (err error)
 
 3. 检查引用计数是否有效(不能小于0)
 
-### FlushPage
+### 4.5 FlushPage
 
 ```go
 func (pager *Pager) FlushPage(page *Page)
@@ -163,7 +163,7 @@ func (pager *Pager) FlushPage(page *Page)
 1. 单个页面的刷盘，当页面被修改后需要保存到磁盘时调用
 2. 写入位置 = 页面号 * 页面大小，写入内容 = 页面数据
 
-### FlushAllPages
+### 4.6 FlushAllPages
 
 ```go
 func (pager *Pager) FlushAllPages()
