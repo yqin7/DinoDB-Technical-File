@@ -13,7 +13,7 @@ DinoDB是一个简单而高效的数据库系统实现，主要关注数据库�
 - **Join.md** - 讲解基于布隆过滤器的哈希连接算法实现和优化
 - **Pager.md** - 描述页面管理器的设计，包括LRU缓存机制和页面替换策略
 - **Transaction.md** - 阐述事务管理器和并发控制设计，包括2PL协议和死锁检测
-- **RecoveryManager.md（开发中）-** 详解基于WAL和简化版ARIES协议的故障恢复机制
+- **RecoveryManager.md -** 详解基于WAL和简化版ARIES协议的故障恢复机制
 
 ## 🚀 项目特点
 * **📊 数据结构**：基于B+树的索引结构，支持高效的查询和范围扫描
@@ -103,7 +103,7 @@ LRU策略：
 
 ### 运行环境
 
-DinoDB是使用Go语言开发的自包含数据库系统，提供的二进制文件可以直接运行：
+DinoDB是使用Go语言开发的自包含数据库系统，提供的二进制文件（在run_me_exe_files文件夹里）可以直接运行：
 
 - **操作系统**：支持Linux、macOS和Windows
 - **依赖**：不需要额外安装Go语言环境或其他数据库系统
@@ -128,7 +128,7 @@ go build -buildvcs=false -o dinodb_stress ./cmd/dinodb_stress
 
 ```bash
 # 启动DinoDB服务器，指定项目和端口
-./dinodb -project concurrency -p 8335
+./dinodb -project recovery -p 8335
 ```
 
 服务器成功启动后会显示：
@@ -156,14 +156,17 @@ dinodb>
 
 ```
 dinodb> .help
-create: Create a table. usage: create table <table>
-find: Find an element. usage: find <key> from <table>
-update: Update en element. usage: update <table> <key> <value>
-delete: Delete an element. usage: delete <key> from <table>
-select: Select elements from a table. usage: select from <table>
 transaction: Handle transactions. usage: transaction <begin|commit>
+create: Create a table. usage: create <btree|hash> table <table>
+select: Select elements from a table. usage: select from <table>
+find: Find an element. usage: find <key> from <table>
+checkpoint: Saves a checkpoint of the current database state and running transactions. usage: checkpoint
+abort: Simulate an abort of the current transaction. usage: abort
 pretty: Print out the internal data representation. usage: pretty
 insert: Insert an element. usage: insert <key> <value> into <table>
+update: Update en element. usage: update <table> <key> <value>
+crash: Crash the database. usage: crash
+delete: Delete an element. usage: delete <key> from <table>
 lock: Grabs a write lock on a resource. usage: lock <table> <key>
 ```
 
@@ -239,6 +242,57 @@ dinodb> lock test 2
 dinodb> transaction commit
 ```
 
+#### 数据库恢复操作
+
+##### 模拟数据库崩溃
+
+```
+dinodb> crash
+Connection to server lost. Please restart the client.
+```
+
+##### 模拟事务中止
+
+```
+dinodb> transaction begin
+dinodb> insert 7 700 into test
+dinodb> abort
+Transaction aborted.
+```
+
+##### 恢复流程展示
+
+```
+# 1. 创建表并添加数据
+dinodb> transaction begin
+dinodb> insert 1 100 into test
+dinodb> insert 2 200 into test
+dinodb> transaction commit
+
+# 2. 创建检查点
+dinodb> checkpoint
+
+# 3. 更多操作
+dinodb> transaction begin
+dinodb> insert 3 300 into test
+dinodb> update test 1 150
+dinodb> transaction commit
+
+# 4. 模拟崩溃
+dinodb> crash
+
+# 5. 重启服务器
+# 在新终端中:
+./dinodb -project recovery -p 8335
+
+# 6. 重新连接客户端
+# 在另一个终端中:
+./dinodb_client -p 8335
+
+# 7. 查看恢复后的数据
+dinodb> select from test
+```
+
 ### 测试
 
 ```bash
@@ -258,8 +312,7 @@ go test './test/concurrency/...' -race -timeout 180s -v
 * **Select操作**：在1-8线程间性能较为稳定，但16线程时出现性能下降
 
 ## 🔮 未来展望
-* 添加索引类型支持
-* 优化大规模数据处理性能
+* 添加区间操作的命令，比如大于小于等。
 
 ## 📫 获取代码
 由于课程要求（不能对未来学弟学妹公开代码），源代码暂时不能公开。如果你对项目感兴趣，请发送邮件至 huo000311@outlook.com 索取代码。

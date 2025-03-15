@@ -635,7 +635,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
                 |                                |
                 | 成功                            |
                 v                                |
-[de_repl.go - transaction_repl.go函数内]          |
+[db_repl.go - transaction_repl.go函数内]          |
 +---------------+---------------+     +----------+----------+
 | 执行B+树查找                    |     | 操作失败            |
 | table.Find(key)               +---->| 执行事务回滚         | [transaction_repl.go - HandleFind函数内]
@@ -670,7 +670,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 
 - 多个事务同时请求同一资源的写锁
 - 第一个事务获取锁后，其他事务一直等待
-- 未看到任何解锁操作的日志，系统最终陷入死锁状态
+- 实际调用了解锁操作，未看到任何解锁操作的日志，系统最终陷入死锁状态
 
 ### B. 问题分析
 
