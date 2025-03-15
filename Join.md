@@ -109,7 +109,7 @@ func Join(
 
 - 根据 joinOnLeftKey和 joinOnRightKey 分别创造是key还是value作为连接键的哈希索引。如果为True的话哈希索引的连接键为Key，反之为Value。
 
-- **调用执行buildHashIndex()创建左右两哈希索引。**创建完成的哈希索引如下
+- **调用执行buildHashIndex()创建左右两哈希索引。**创建完成的哈希索引如下：
 
 ​									**左表临时哈希索引(初始)**
 
