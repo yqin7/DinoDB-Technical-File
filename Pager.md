@@ -9,8 +9,17 @@
    不再使用的页面放入 unpinnedList 尾部（最近使用）（候选淘汰）
 
    获得新page，freeList没有空闲时从 unpinnedList 头部获取（最久未使用）
-   
-2. 注意：freeList不会补充，它只作为初始的空闲页面池使用。freeList用完为空之后，如果获取新页面从unpinnedList刷盘后获取。
+
+2. 数据库通常采用"脏页延迟写回"策略。当页面被修改后，不会立即写回磁盘，而是标记为脏页放在unpinnedList并保留在内存中尽可能长时间，之后如果需要再次读取可以从内存中读取。LRU能保证最近修改的热点页面尽量留在内存中。
+
+3. 注意：freeList不会补充，它只作为初始的空闲页面池使用。freeList用完为空之后，如果获取新页面从unpinnedList刷盘后获取。
+
+### 1.2 不使用LFU原因
+
+1. LFU容易出现"频率陷阱"：过去频繁访问但最近不再使用的页面会因高频率计数而长期占用内存
+
+2. LFU对新加入但重要的页面不友好，也就是说新加入到unpinnedList 的重要页面一开始频率统计次数为1，之后调用`GetNewPage()`时候会立即让这页刷盘在内存中移除。之后要对该页面访问又必须从磁盘中访问。
+3. 实现更复杂，需要额外的数据结构维护频率计数和排序
 
 ## 2. 重要参数
 
@@ -88,7 +97,7 @@ func (pager *Pager) newPage(pagenum int64) (newPage *Page, err error)
 
 1. 优先从 freeList(空闲页面列表)获取可用页面
 2. 如果 freeList 为空，尝试从 unpinnedList(未固定页面列表)淘汰一个页面
-  - 获取页面后需要先将其数据刷新到磁盘
+  - **获取页面后需要先将其数据刷新到磁盘（这里是页面管理器唯一刷盘时机，本项目采用惰性刷盘）**
   - 从pageTable中删除该页面的旧映射
 
 3. 如果以上两种方式都无法获取页面，返回 ErrRanOutOfPages 错误
@@ -131,7 +140,7 @@ func (pager *Pager) GetPage(pagenum int64) (page *Page, err error)
 
 3. 页面不在 pageTable 中：
 
-- 创建新页面
+- 调用`newPage(pagenum)`创建新页面
 - 从磁盘加载数据
 - 读取失败则放入 freeList
 - 读取成功则加入 pinnedList 尾部并更新 pageTable
