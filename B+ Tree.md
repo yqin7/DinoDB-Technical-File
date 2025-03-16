@@ -302,15 +302,15 @@ func (index *BTreeIndex) Insert(key int64, value int64)
    - 更新numKeys
    - 最终树组装完成👇
 
-                  	      ```
-                                          [key3]         (页面0)
+                  	      ```go
+                                            [key3]         (页面0)
                                   	     /       \
                                   	[key2]        [key4]    (其他页面)
-                            	/    \       /      \
-                          [key1]->[key2]->[key3]->[key4,key5]
-             ```
-            
-            
+                            	        /    \       /      \
+                                [key1]->[key2]->[key3]->[key4,key5]
+              ```
+
+   ​         
 
 6. 图示
 
