@@ -105,7 +105,7 @@ commitLog{
   < 789e0123-e89b-12d3-a456-426614174000 start >
   < 789e0123-e89b-12d3-a456-426614174000, students, INSERT, 30, 0, 400 >
   < 456e7890-e89b-12d3-a456-426614174000, students, DELETE, 20, 300, 0 >
-  < 456e7890-e89b-12d3-a456-426614174000 commit >
+  < 456e7890-e89b-12d3-a456-426614174000 commi-t >
   < 789e0123-e89b-12d3-a456-426614174000, students, UPDATE, 30, 400, 500 >
   ```
 
@@ -241,7 +241,7 @@ err = rm.logFile.Sync() // 确保数据刷新到磁盘
 
 # 3. 核心函数
 
-## 3.1 Table
+## 3.1 Table创建表对象
 
 ```go
 func (rm *RecoveryManager) Table(tblType string, tblName string) error
@@ -297,7 +297,7 @@ func (rm *RecoveryManager) Table(tblType string, tblName string) error
   ```
   < create btree table students >
 
-## 3.2 Start
+## 3.2 Start开启单个活跃事务
 
 ```go
 func (rm *RecoveryManager) Start(clientId uuid.UUID) error
@@ -354,7 +354,7 @@ func (rm *RecoveryManager) Start(clientId uuid.UUID) error
 
 - 注：这里假设UUID值`123e4567-e89b-12d3-a456-426614174000`代表事务ID(tx1)
 
-## 3.3 Edit
+## 3.3 Edit单条编辑操作
 
 ```go
 func (rm *RecoveryManager) Edit(clientId uuid.UUID, table database.Index, action action, key int64, oldval int64, newval int64) error
@@ -432,7 +432,7 @@ func (rm *RecoveryManager) Edit(clientId uuid.UUID, table database.Index, action
 
 - 注：这里假设UUID值`123e4567-e89b-12d3-a456-426614174000`代表事务ID(tx1)
 
-## 3.4 Commit
+## 3.4 Commit提交活跃事务
 
 ```go
 func (rm *RecoveryManager) Commit(clientId uuid.UUID) error
@@ -488,7 +488,7 @@ func (rm *RecoveryManager) Commit(clientId uuid.UUID) error
   < 123e4567-e89b-12d3-a456-426614174000 commit >
   ```
 
-## 3.5 Checkpoint
+## 3.5 Checkpoint所有事务刷盘
 
 ```go
 func (rm *RecoveryManager) Checkpoint() error
@@ -567,7 +567,7 @@ func (rm *RecoveryManager) Checkpoint() error
   ```
 
 
-## 3.6 Redo
+## 3.6 Redo单条命令重做
 
 ```go
 func (rm *RecoveryManager) redo(log log) error
@@ -657,7 +657,7 @@ func (rm *RecoveryManager) redo(log log) error
   1. 执行`delete 10 from students`
   2. 如果记录不存在，返回错误，恢复过程会处理此错误
 
-## 3.7 Undo
+## 3.7 Undo单条命令撤销
 
 ```go
 func (rm *RecoveryManager) undo(log editLog) error
@@ -747,7 +747,7 @@ func (rm *RecoveryManager) undo(log editLog) error
   1. 撤销操作构造命令：`insert 10 100 into students`。
   2. 调用 `HandleInsert` 重新插入记录，从而撤销删除操作。
 
-## 3.8 Recover
+## 3.8 Recover崩溃后恢复
 
 ```go
 func (rm *RecoveryManager) Recover() error
@@ -794,6 +794,12 @@ func (rm *RecoveryManager) Recover() error
   - **commitLog**：移除相应事务的活跃标记。
   - **tableLog**：调用 `rm.redo(l)` 重做表创建操作；若返回错误且不包含"already exists"，则返回错误。
   - **editLog**：将编辑日志记录追加到 `transactionLogs` 中，按事务 ID 分类存储。
+
+- **如何确定活跃事务：**
+
+  - 遇到 `startLog`：将事务标记为活跃 (`activeTransactions[id] = true`)
+
+  - 遇到 `commitLog`：移除事务的活跃标记 (`delete(activeTransactions, id)`)，commit之后就是非活跃事务
 
 **5. 第二阶段：重做 - 重做检查点之后的编辑操作**
 
@@ -855,7 +861,7 @@ func (rm *RecoveryManager) Recover() error
   3. **撤销阶段**：逆序撤销 T2 的所有操作，包括检查点之前的，保留 T1 的操作。
   4. 结果：数据库状态恢复为只包含 T1 提交的更改。
 
-## 3.9 Rollback
+## 3.9 Rollback主动回滚
 
 ```go
 func (rm *RecoveryManager) Rollback(clientId uuid.UUID) error
