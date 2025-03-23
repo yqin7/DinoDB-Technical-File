@@ -405,7 +405,7 @@ func (rm *RecoveryManager) Edit(clientId uuid.UUID, table database.Index, action
 - 检查txStack中是否已存在该事务的日志记录，如不存在则初始化
 - 将当前编辑日志添加到对应事务的日志栈中，用于潜在的事务回滚
 
-**4	. 返回结果**
+**4. 返回结果**
 
 - 如果操作成功，返回 nil
 - 如有错误发生，返回带上下文信息的错误
