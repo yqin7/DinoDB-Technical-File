@@ -432,7 +432,7 @@ func (rm *RecoveryManager) Edit(clientId uuid.UUID, table database.Index, action
 
 - 注：这里假设UUID值`123e4567-e89b-12d3-a456-426614174000`代表事务ID(tx1)
 
-## 3.4 Commit提交活跃事务
+## 3.4 Commit提交单条事务
 
 ```go
 func (rm *RecoveryManager) Commit(clientId uuid.UUID) error
