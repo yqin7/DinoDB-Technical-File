@@ -228,9 +228,10 @@ func (index *BTreeIndex) Insert(key int64, value int64)
 2. 叶子节点插入和分裂
 
    - 调用链：`LeafNode[key3,key4].insert(5) -> node.split()`
-
-
-   - 分裂结果：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`，**这里返回的Split信息是上一层内部节点中插入的新的分隔键和指针（子节点页号）**
+   
+   
+      - 分裂结果：`Split{key:key4, leftPN:key3的page, rightPN:key4的page}`，**这里返回的Split信息是上一层内部节点中插入的新的分隔键和指针（子节点页号）**
+   
 
 
 ```
@@ -308,7 +309,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
                                   	[key2]        [key4]    (其他页面)
                             	        /    \       /      \
                                 [key1]->[key2]->[key3]->[key4,key5]
-               ```
+                ```
 
    ​         
 
