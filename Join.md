@@ -139,24 +139,25 @@ func Join(
 - 全局深度决定了哈希索引目录的大小(2^全局深度)，表示哈希索引目录的大小，有多少个buckets，可以通过哈希值的多少位来定位bucket。比如全局深度 = 2时，buckets的数量为2 ^ 2 = 4
 - 左右两哈希索引扩展相同全局深度的目的是在探测(probe)阶段，每个bucket都有另一边相匹配的bucket对应。
 
-- 注意：目录大小是2^全局深度，但实际的物理bucket数量可能更少，因为多个目录项可能指向同一个物理bucket。比如当一个bucket的LocalDepth小于GlobalDepth时，就会出现多个目录项指向同一个bucket的。
+- 注意：目录大小是2^全局深度，但实际的物理bucket数量可能更少，因为多个目录项可能指向同一个物理bucket（物理页）。比如当一个bucket的LocalDepth小于GlobalDepth时，就会出现多个目录项指向同一个物理bucket（物理页）。
 
 **3. 探测阶段**
 
 - 获得左右所有的buckets页号，存储形式是通过目录数组，存储bucket的页号
-- 创建seen用来跳过重复配对的bucket pair，比如（以下例子非本例）
+- 创建seen用来跳过重复配对的bucket pair，比如
 
 ```
-假设GlobalDepth=2，但某些bucket的LocalDepth仍为1:
+假设左表GlobalDepth=2，但某些bucket的LocalDepth仍为1
+右表GlobalDepth=1，所有bucket的LocalDepth等于1，在确保左右哈希索引相同全局深度被扩展到了GlobalDepth=2
 
-leftBuckets = [0,0,1,1]   // 页号，LocalDepth=1导致两个目录项指向同一个物理bucket
-rightBuckets = [0,0,1,1]   
+leftBuckets = [0,1,2,1]   // 这里可以看出leftBuckets[1]和leftBuckets[3]共享一个物理bucket，因为它们的局部深度=1
+rightBuckets = [5,6,5,6]  // 这里可以看出rightBuckets[0]和rightBuckets[2]，rightBuckets[1]和rightBuckets[3]共享一个物理bucket，因为它们的局部深度=1
 
 处理过程：
-1. i=0: pair{l:0, r:0} -> 首次遇到，加入seenList，处理这对bucket
-2. i=1: pair{l:0, r:0} -> 已在seenList中，跳过（避免重复处理）
-3. i=2: pair{l:1, r:1} -> 首次遇到，加入seenList，处理这对bucket
-4. i=3: pair{l:1, r:1} -> 已在seenList中，跳过
+1. i=0: pair{l:0, r:5} -> 首次遇到，加入seenList，处理这对bucket
+2. i=1: pair{l:1, r:6} -> 首次遇到，加入seenList，处理这对bucket
+3. i=2: pair{l:2, r:5} -> 首次遇到，加入seenList，处理这对bucket
+4. i=3: pair{l:1, r:6} -> 已在seenList中，跳过
 ```
 
 - **获得左右表对应的bucket，执行probeBuckets()进行在关联bucket中匹配键值对**，得到两边bucket中相匹配的键值对。
