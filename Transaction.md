@@ -583,7 +583,7 @@ func (tm *TransactionManager) Commit(clientId uuid.UUID)
 
   - 内存使用随事务数量线性增长，没有泄漏
 
-## 4.9REPL命令执行流程
+## 4.9 REPL命令执行流程
 
 ![transactionREPL](./images/transactionREPL.jpg)
 
