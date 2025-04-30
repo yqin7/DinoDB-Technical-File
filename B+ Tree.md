@@ -309,7 +309,7 @@ func (index *BTreeIndex) Insert(key int64, value int64)
                                   	[key2]        [key4]    (其他页面)
                             	        /    \       /      \
                                 [key1]->[key2]->[key3]->[key4,key5]
-                ```
+                 ```
 
    ​         
 
@@ -638,6 +638,9 @@ func (index *BTreeIndex) Update(key int64, value int64) error
 | - nodeType = INTERNAL  |  // 1字节
 | - numKeys = 202        |  // 10字节
 +------------------------+  NODE_HEADER_SIZE = 11
+| - KEY_SIZE             |
++------------------------+  // 10字节
+|                        |
 | Keys Array             |
 | - key1 = 10            |  // 10字节
 | - key2 = 20            |  // 10字节
